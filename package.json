@@ -8,10 +8,10 @@
   ],
   "scripts": {
     "dev": "bun run --parallel dev:server dev:client",
-    "dev:client": "bun --cwd apps/client run dev",
-    "dev:server": "bun --cwd apps/server run dev",
-    "build": "bun --cwd apps/client run build",
-    "check": "bun --cwd apps/client run check && bun --cwd apps/server run check",
+    "dev:client": "cd apps/client && bun run dev",
+    "dev:server": "cd apps/server && bun run dev",
+    "build": "cd apps/client && bun run build",
+    "check": "bunx tsc --noEmit -p apps/client/tsconfig.json && bunx tsc --noEmit -p apps/server/tsconfig.json",
     "test": "bun test"
   },
   "devDependencies": {
