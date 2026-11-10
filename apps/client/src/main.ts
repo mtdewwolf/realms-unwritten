@@ -1,6 +1,8 @@
 import * as THREE from "three";
 import "./style.css";
 import { populateFrontierProps } from "./world/frontierProps";
+import { createAdventurer, createWolf } from "./characters/rig";
+import { WOLF_MAX_HEALTH, ATTACK_STAMINA, DODGE_STAMINA, regenerateStamina, useStamina, withinAttackRange } from "./gameplay/combat";
 
 const app = document.querySelector<HTMLDivElement>("#app");
 if (!app) throw new Error("App element missing");
@@ -81,33 +83,38 @@ for (let i = 0; i < 125; i++) {
   leaves.position.set(x, 3.1, z);
   scene.add(trunk, leaves);
 }
-const avatar = new THREE.Group();
-const body = new THREE.Mesh(
-  new THREE.CapsuleGeometry(0.42, 1.0, 4, 8),
-  new THREE.MeshLambertMaterial({ color: 0x355db5 })
-);
-body.position.y = 1.13;
-avatar.add(body);
-const head = new THREE.Mesh(
-  new THREE.SphereGeometry(0.32, 12, 8),
-  new THREE.MeshLambertMaterial({ color: 0xe7c7a2 })
-);
-head.position.y = 2.17;
-avatar.add(head);
-const sword = box(0.1, 1.45, 0.13, 0xe5eaf2);
-sword.position.set(0.59, 1.15, 0.02);
-sword.rotation.z = -0.35;
-avatar.add(sword);
+const adventurer = createAdventurer();
+const avatar = adventurer.root;
 scene.add(avatar);
-
-const wolf = new THREE.Group();
-wolf.add(new THREE.Mesh(
-  new THREE.BoxGeometry(1.25, 0.7, 0.6),
-  new THREE.MeshLambertMaterial({ color: 0x6d6257 })
-));
-wolf.position.set(5, 0.7, 5);
+const wolf = createWolf();
+wolf.position.set(5, 0, 5);
 scene.add(wolf);
 
+const warningRing = new THREE.Mesh(
+  new THREE.RingGeometry(1.05, 1.26, 40),
+  new THREE.MeshBasicMaterial({color:0xf76553,side:THREE.DoubleSide,transparent:true,opacity:0.8,depthWrite:false})
+);
+warningRing.rotation.x = -Math.PI/2;
+warningRing.position.set(5,0.05,5);
+warningRing.visible = false;
+scene.add(warningRing);
+let wolfHealth = WOLF_MAX_HEALTH;
+let playerStamina = PLAYER_MAX_STAMINA;
+let lastAttackTime = -10;
+let attackingUntil = 0;
+let dodgeUntil = 0;
+let wolfWarningAt = 0;
+let wolfStrikeAt = 0;
+let playerHealth = 100;
+let previousAttackDistance = 0;
+const combatHud = document.createElement("div");
+combatHud.id = "combat-hud";
+combatHud.innerHTML = '<div>HEALTH <meter id="hp" min="0" max="100" value="100"></meter></div><div>STAMINA <meter id="stamina" min="0" max="100" value="100"></meter></div><div>WOLF <meter id="wolf-hp" min="0" max="60" value="60"></meter></div><strong id="battle-info">Wolf encounter · move closer to attack</strong>';
+document.querySelector("#app")!.appendChild(combatHud);
+const hpDisplay = document.querySelector<HTMLMeterElement>("#hp")!;
+const staminaDisplay = document.querySelector<HTMLMeterElement>("#stamina")!;
+const wolfDisplay = document.querySelector<HTMLMeterElement>("#wolf-hp")!;
+const battleInfo = document.querySelector<HTMLElement>("#battle-info")!;
 const stick = document.querySelector<HTMLElement>("#stick")!;
 const knob = document.querySelector<HTMLElement>("#knob")!;
 const status = document.querySelector<HTMLElement>("#status")!;
@@ -164,19 +171,50 @@ canvas.addEventListener("pointercancel", e => {
 canvas.addEventListener("wheel", e => {
   distance = THREE.MathUtils.clamp(distance + e.deltaY * 0.01, 11, 30);
 }, { passive: true });
-document.querySelector("#attack")!.addEventListener("click", () => {
-  status.textContent = "Sword slash!";
-  sword.rotation.z = -1.3;
-  setTimeout(() => sword.rotation.z = -0.35, 180);
-});
+function attack() {
+  const now=performance.now()/1000;
+  if(now-lastAttackTime < 0.65 || wolfHealth <= 0) return;
+  const next=useStamina(playerStamina,ATTACK_STAMINA);
+  if(next===null){battleInfo.textContent="Not enough stamina";return;}
+  playerStamina=next;lastAttackTime=now;
+  attackingUntil=now+0.27;
+  if(withinAttackRange(avatar.position.x,avatar.position.z,wolf.position.x,wolf.position.z)) {
+    wolfHealth=Math.max(0,wolfHealth-20);
+    battleInfo.textContent=wolfHealth>0?"Sword hit · 20 damage":"Wolf defeated!";
+    wolfDisplay.value=wolfHealth;
+    if(!wolfHealth) {wolf.visible=false;warningRing.visible=false;}
+  } else battleInfo.textContent="Too far from the wolf";
+}
+function dodge() {
+  const now=performance.now()/1000;
+  if(now<dodgeUntil)return;
+  const next=useStamina(playerStamina,DODGE_STAMINA);
+  if(next===null) {battleInfo.textContent="Not enough stamina";return;}
+  playerStamina=next;
+  dodgeUntil=now+0.6;
+  const direction=new THREE.Vector3(Math.sin(avatar.rotation.y),0,Math.cos(avatar.rotation.y));
+  avatar.position.addScaledVector(direction,2.25);
+  avatar.position.x=THREE.MathUtils.clamp(avatar.position.x,-46,46);
+  avatar.position.z=THREE.MathUtils.clamp(avatar.position.z,-46,46);
+  battleInfo.textContent="Dodged!";
+}
+document.querySelector("#attack")!.addEventListener("click", attack);
 document.querySelector("#gather")!.addEventListener("click", () => {
-  status.textContent = "Gathering requires the multiplayer world server (next milestone).";
+  status.textContent="Gathering needs an authoritative world server (planned).";
 });
-
+const dodgeButton = document.createElement("button");
+dodgeButton.id="dodge";
+dodgeButton.innerHTML='↝<span>DODGE</span>';
+document.querySelector("#actions")!.prepend(dodgeButton);
+dodgeButton.addEventListener("click",dodge);
 let previous = performance.now();
+let elapsed = 0;
 function frame(now: number) {
   const dt = Math.min((now - previous) / 1000, 0.05);
   previous = now;
+  elapsed += dt;
+  playerStamina = regenerateStamina(playerStamina,dt);
+  staminaDisplay.value=playerStamina;
   const x = axisX + Number(keys.has("d")) - Number(keys.has("a"));
   const z = axisZ + Number(keys.has("s")) - Number(keys.has("w"));
   const length = Math.hypot(x, z);
@@ -188,6 +226,32 @@ function frame(now: number) {
     avatar.position.x = THREE.MathUtils.clamp(avatar.position.x, -46, 46);
     avatar.position.z = THREE.MathUtils.clamp(avatar.position.z, -46, 46);
     avatar.rotation.y = Math.atan2(heading.x, heading.z);
+  }
+  adventurer.update(elapsed,length>0.05,now/1000<attackingUntil);
+  if(wolfHealth>0){
+    const dx=avatar.position.x-wolf.position.x, dz=avatar.position.z-wolf.position.z;
+    const range=Math.hypot(dx,dz);
+    wolf.lookAt(avatar.position.x,0,avatar.position.z);
+    if(range<7 && range>2.2 && wolfStrikeAt===0){
+      const speed=Math.min(dt*0.85,range-2.2);
+      wolf.position.x+=dx/range*speed;
+      wolf.position.z+=dz/range*speed;
+    }
+    if(range<2.7 && wolfStrikeAt===0){
+      wolfWarningAt=now/1000;
+      wolfStrikeAt=wolfWarningAt+0.85;
+      battleInfo.textContent="⚠ Wolf preparing to strike!";
+    }
+    warningRing.visible=wolfStrikeAt>0;
+    warningRing.position.set(wolf.position.x,0.05,wolf.position.z);
+    if(wolfStrikeAt>0 && now/1000>=wolfStrikeAt){
+      if(range<3.0 && now/1000>dodgeUntil){
+        playerHealth=Math.max(0,playerHealth-12);
+        hpDisplay.value=playerHealth;
+        battleInfo.textContent="Wolf bite · 12 damage";
+      } else battleInfo.textContent="Wolf attack missed!";
+      wolfStrikeAt=0;
+    }
   }
   const pitch = THREE.MathUtils.degToRad(55);
   const offset = new THREE.Vector3(
