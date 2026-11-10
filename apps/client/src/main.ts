@@ -2,6 +2,7 @@ import * as THREE from "three";
 import "./style.css";
 import { populateFrontierProps } from "./world/frontierProps";
 import { createAdventurer, createWolf } from "./characters/rig";
+import { pointerSpacing, zoomFromPinch } from "./input/touchCamera";
 import { PLAYER_MAX_STAMINA, WOLF_MAX_HEALTH, ATTACK_STAMINA, DODGE_STAMINA, regenerateStamina, useStamina, withinAttackRange } from "./gameplay/combat";
 
 const app = document.querySelector<HTMLDivElement>("#app");
@@ -106,7 +107,7 @@ let dodgeUntil = 0;
 let wolfWarningAt = 0;
 let wolfStrikeAt = 0;
 let playerHealth = 100;
-let previousAttackDistance = 0;
+let nextWolfAttackAt = 0;
 const combatHud = document.createElement("div");
 combatHud.id = "combat-hud";
 combatHud.innerHTML = '<div>HEALTH <meter id="hp" min="0" max="100" value="100"></meter></div><div>STAMINA <meter id="stamina" min="0" max="100" value="100"></meter></div><div>WOLF <meter id="wolf-hp" min="0" max="60" value="60"></meter></div><strong id="battle-info">Wolf encounter · move closer to attack</strong>';
@@ -122,11 +123,19 @@ let axisX = 0, axisZ = 0;
 let yaw = Math.PI / 4;
 let distance = 20;
 let activeStick: number | null = null;
-let cameraPointer: number | null = null;
-let lastX = 0;
+const cameraTouches = new Map<number, {x: number; y: number}>();
+let lastCameraX = 0;
+let lastPinchDistance = 0;
 const keys = new Set<string>();
 window.addEventListener("keydown", e => keys.add(e.key.toLowerCase()));
 window.addEventListener("keyup", e => keys.delete(e.key.toLowerCase()));
+function resetTouchInput(){
+  axisX=axisZ=0;activeStick=null;cameraTouches.clear();
+  lastPinchDistance=0;knob.style.transform="translate(0,0)";
+  keys.clear();
+}
+document.addEventListener("visibilitychange",()=>{if(document.hidden)resetTouchInput();});
+window.addEventListener("blur",resetTouchInput);
 stick.addEventListener("pointerdown", e => {
   activeStick = e.pointerId;
   stick.setPointerCapture(e.pointerId);
@@ -153,27 +162,37 @@ function endStick(e: PointerEvent) {
 stick.addEventListener("pointerup", endStick);
 stick.addEventListener("pointercancel", endStick);
 canvas.addEventListener("pointerdown", e => {
-  cameraPointer = e.pointerId;
-  lastX = e.clientX;
+  if (cameraTouches.size >= 2) return;
+  cameraTouches.set(e.pointerId,{x:e.clientX,y:e.clientY});
   canvas.setPointerCapture(e.pointerId);
+  if(cameraTouches.size===1) lastCameraX=e.clientX;
+  else lastPinchDistance=pointerSpacing([...cameraTouches.values()]);
 });
 canvas.addEventListener("pointermove", e => {
-  if (cameraPointer !== e.pointerId) return;
-  yaw -= (e.clientX - lastX) * 0.007;
-  lastX = e.clientX;
+  if (!cameraTouches.has(e.pointerId)) return;
+  cameraTouches.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  if(cameraTouches.size===1) {
+    yaw -= (e.clientX-lastCameraX)*0.007;
+    lastCameraX=e.clientX;
+  } else if(cameraTouches.size===2) {
+    const nextDistance=pointerSpacing([...cameraTouches.values()]);
+    if(lastPinchDistance>0) distance=zoomFromPinch(distance,lastPinchDistance,nextDistance);
+    lastPinchDistance=nextDistance;
+  }
 });
-canvas.addEventListener("pointerup", e => {
-  if (cameraPointer === e.pointerId) cameraPointer = null;
-});
-canvas.addEventListener("pointercancel", e => {
-  if (cameraPointer === e.pointerId) cameraPointer = null;
-});
+function releaseCameraPointer(e:PointerEvent) {
+  if(!cameraTouches.delete(e.pointerId)) return;
+  if(cameraTouches.size===1) lastCameraX=[...cameraTouches.values()][0].x;
+  else lastPinchDistance=0;
+}
+canvas.addEventListener("pointerup", releaseCameraPointer);
+canvas.addEventListener("pointercancel", releaseCameraPointer);
 canvas.addEventListener("wheel", e => {
   distance = THREE.MathUtils.clamp(distance + e.deltaY * 0.01, 11, 30);
 }, { passive: true });
 function attack() {
   const now=performance.now()/1000;
-  if(now-lastAttackTime < 0.65 || wolfHealth <= 0) return;
+  if(now-lastAttackTime < 0.65 || wolfHealth <= 0 || playerHealth <= 0) return;
   const next=useStamina(playerStamina,ATTACK_STAMINA);
   if(next===null){battleInfo.textContent="Not enough stamina";return;}
   playerStamina=next;lastAttackTime=now;
@@ -187,7 +206,7 @@ function attack() {
 }
 function dodge() {
   const now=performance.now()/1000;
-  if(now<dodgeUntil)return;
+  if(now<dodgeUntil || playerHealth<=0)return;
   const next=useStamina(playerStamina,DODGE_STAMINA);
   if(next===null) {battleInfo.textContent="Not enough stamina";return;}
   playerStamina=next;
@@ -218,7 +237,7 @@ function frame(now: number) {
   const x = axisX + Number(keys.has("d")) - Number(keys.has("a"));
   const z = axisZ + Number(keys.has("s")) - Number(keys.has("w"));
   const length = Math.hypot(x, z);
-  if (length > 0.05) {
+  if (length > 0.05 && playerHealth > 0) {
     const forward = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw));
     const right = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw));
     const heading = right.multiplyScalar(x).addScaledVector(forward, -z).normalize();
@@ -227,17 +246,17 @@ function frame(now: number) {
     avatar.position.z = THREE.MathUtils.clamp(avatar.position.z, -46, 46);
     avatar.rotation.y = Math.atan2(heading.x, heading.z);
   }
-  adventurer.update(elapsed,length>0.05,now/1000<attackingUntil);
+  adventurer.update(elapsed,length>0.05 && playerHealth>0,now/1000<attackingUntil);
   if(wolfHealth>0){
     const dx=avatar.position.x-wolf.position.x, dz=avatar.position.z-wolf.position.z;
     const range=Math.hypot(dx,dz);
     wolf.lookAt(avatar.position.x,0,avatar.position.z);
-    if(range<7 && range>2.2 && wolfStrikeAt===0){
+    if(range<7 && range>2.2 && wolfStrikeAt===0 && playerHealth>0){
       const speed=Math.min(dt*0.85,range-2.2);
       wolf.position.x+=dx/range*speed;
       wolf.position.z+=dz/range*speed;
     }
-    if(range<2.7 && wolfStrikeAt===0){
+    if(range<2.7 && wolfStrikeAt===0 && now/1000>=nextWolfAttackAt && playerHealth>0){
       wolfWarningAt=now/1000;
       wolfStrikeAt=wolfWarningAt+0.85;
       battleInfo.textContent="⚠ Wolf preparing to strike!";
@@ -245,12 +264,15 @@ function frame(now: number) {
     warningRing.visible=wolfStrikeAt>0;
     warningRing.position.set(wolf.position.x,0.05,wolf.position.z);
     if(wolfStrikeAt>0 && now/1000>=wolfStrikeAt){
-      if(range<3.0 && now/1000>dodgeUntil){
+      const strikeRange=Math.hypot(avatar.position.x-wolf.position.x,avatar.position.z-wolf.position.z);
+      if(strikeRange<3.0 && now/1000>dodgeUntil && playerHealth>0){
         playerHealth=Math.max(0,playerHealth-12);
         hpDisplay.value=playerHealth;
         battleInfo.textContent="Wolf bite · 12 damage";
       } else battleInfo.textContent="Wolf attack missed!";
       wolfStrikeAt=0;
+      nextWolfAttackAt=now/1000+1.5;
+      if(playerHealth===0) battleInfo.textContent="Defeated · restart to retry";
     }
   }
   const pitch = THREE.MathUtils.degToRad(55);

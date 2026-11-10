@@ -6,3 +6,5 @@
 #combat-hud strong{font-size:10px;line-height:1.25;max-width:220px}
 #dodge{background:#285a67e8!important;width:70px!important;height:70px!important}
 @media(max-height:410px){#combat-hud{top:52px;padding:5px 8px;min-width:160px;font-size:9px}#combat-hud meter{width:85px}#combat-hud strong{font-size:9px}#dodge{width:56px!important;height:56px!important}}
+
+@media (orientation: portrait) { #hint { display:block;bottom:40%;left:50%;width:85%;font-size:13px; } #actions { bottom:max(20px,env(safe-area-inset-bottom)); } }
