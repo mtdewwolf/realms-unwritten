@@ -1,0 +1,38 @@
+name: Build Blender Character Assets
+
+on:
+  push:
+    branches: [Master, main]
+    paths:
+      - 'tools/blender/**'
+      - '.github/workflows/blender-assets.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-assets:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Blender
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends blender
+          blender --version
+      - name: Generate original rigged characters
+        run: |
+          blender --background --factory-startup --python tools/blender/generate_characters.py -- --out build/assets
+      - name: Validate GLB skin and animations
+        run: python3 tools/blender/validate_glb.py build/assets
+      - name: Generate hashes
+        run: sha256sum build/assets/*.glb > build/assets/SHA256SUMS
+      - name: Publish source-independent build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: realms-unwritten-character-glbs
+          path: build/assets/
+          if-no-files-found: error
+          retention-days: 30
