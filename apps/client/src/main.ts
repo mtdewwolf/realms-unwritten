@@ -2,7 +2,7 @@ import * as THREE from "three";
 import "./style.css";
 import { populateFrontierProps } from "./world/frontierProps";
 import { createAdventurer, createWolf } from "./characters/rig";
-import { WOLF_MAX_HEALTH, ATTACK_STAMINA, DODGE_STAMINA, regenerateStamina, useStamina, withinAttackRange } from "./gameplay/combat";
+import { PLAYER_MAX_STAMINA, WOLF_MAX_HEALTH, ATTACK_STAMINA, DODGE_STAMINA, regenerateStamina, useStamina, withinAttackRange } from "./gameplay/combat";
 
 const app = document.querySelector<HTMLDivElement>("#app");
 if (!app) throw new Error("App element missing");
