@@ -1,0 +1,21 @@
+{
+  "name": "@realms/client",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "tsc --noEmit && vite build",
+    "check": "tsc --noEmit",
+    "preview": "vite preview --host"
+  },
+  "dependencies": {
+    "three": "^0.181.0",
+    "@capacitor/core": "^7.4.0"
+  },
+  "devDependencies": {
+    "@types/three": "^0.181.0",
+    "vite": "^7.2.0",
+    "@capacitor/cli": "^7.4.0",
+    "@capacitor/android": "^7.4.0"
+  }
+}

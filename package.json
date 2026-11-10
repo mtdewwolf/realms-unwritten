@@ -1,0 +1,21 @@
+{
+  "name": "realms-unwritten",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "bun run --parallel dev:server dev:client",
+    "dev:client": "bun --cwd apps/client run dev",
+    "dev:server": "bun --cwd apps/server run dev",
+    "build": "bun --cwd apps/client run build",
+    "check": "bun --cwd apps/client run check && bun --cwd apps/server run check",
+    "test": "bun test"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "@types/bun": "^1.3.0"
+  }
+}
