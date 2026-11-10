@@ -34,3 +34,7 @@ cd android
 The resulting file is `apps/client/android/app/build/outputs/apk/debug/app-debug.apk`.
 
 Debug builds permit cleartext local networking. Production multiplayer must use TLS (`wss://`) and an externally hosted authoritative Bun server. The bundled server is currently only a health-check placeholder.
+
+## Asset development
+
+The Android client now adds original procedural village-market stalls, rock clusters, flowers, a campfire and a signpost. These are first-pass geometry blockouts, not external model assets. See [Android asset production plan](docs/assets/PRODUCTION_PLAN.md) and the typed [asset catalog](apps/client/src/assets/catalog.ts) for the replacement pipeline and budgets.

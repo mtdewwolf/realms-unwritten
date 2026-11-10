@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import "./style.css";
+import { populateFrontierProps } from "./world/frontierProps";
 
 const app = document.querySelector<HTMLDivElement>("#app");
 if (!app) throw new Error("App element missing");
@@ -64,6 +65,7 @@ function house(x: number, z: number) {
 house(-6, -5);
 house(7, -9);
 house(-7, 7);
+populateFrontierProps(scene);
 
 const trunkGeo = new THREE.CylinderGeometry(0.19, 0.27, 2.1, 6);
 const leavesGeo = new THREE.ConeGeometry(1.35, 3.4, 7);
