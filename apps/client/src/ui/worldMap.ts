@@ -1,6 +1,7 @@
 import { biomeAt } from "../world/terrain";
 import { landmarksNear, type Landmark } from "../world/landmarks";
 import { WORLD_HALF_SIZE } from "../world/chunkedWorld";
+import type { Settlement } from "../world/settlements";
 
 export const MAP_CELL_SIZE=64;
 export const MAP_VIEW_RADIUS=512;
@@ -43,6 +44,7 @@ export class WorldMap {
   private readonly ctx:CanvasRenderingContext2D;
   private readonly visited=parseExploredCells(storageRead());
   private readonly known=new Map<string,Landmark>();
+  private readonly knownTowns=new Map<string,Settlement>();
   private readonly viewSize=320;
   private center:MapPoint={x:0,z:0};
   private waypoint:MapPoint|null=null;
@@ -95,6 +97,9 @@ export class WorldMap {
     this.dirty=true;
     if(next)this.render();
   }
+  recordSettlement(town:Settlement):void{
+    this.knownTowns.set(town.id,town);this.dirty=true;
+  }
   recordDiscovered(landmark:Landmark):void{
     this.known.set(landmark.id,landmark);this.dirty=true;
   }
@@ -137,6 +142,12 @@ export class WorldMap {
       ctx.fillStyle=markerColor[poi.type];
       ctx.beginPath();ctx.arc(p.x,p.z,4,0,Math.PI*2);ctx.fill();
     }
+    for(const town of this.knownTowns.values()){
+      const p=worldToMap(town,this.center,size);
+      if(p.x<0||p.z<0||p.x>size||p.z>size)continue;
+      ctx.fillStyle="#fbe4ac";ctx.fillRect(p.x-4,p.z-4,8,8);
+      ctx.strokeStyle="#563f27";ctx.strokeRect(p.x-4,p.z-4,8,8);
+    }
     if(this.waypoint){
       const p=worldToMap(this.waypoint,this.center,size);
       if(p.x>=0&&p.z>=0&&p.x<=size&&p.z<=size){
@@ -146,7 +157,7 @@ export class WorldMap {
     }
     ctx.fillStyle="#ffffff";ctx.beginPath();ctx.arc(size/2,size/2,5,0,Math.PI*2);ctx.fill();
     ctx.fillStyle="#f6e6b5";ctx.font="bold 12px system-ui";ctx.fillText("N",size/2-4,15);
-    this.info.textContent="Explored cells: "+this.visited.size+" | Known landmarks: "+this.known.size+" | View: 1.024 km";
+    this.info.textContent="Explored cells: "+this.visited.size+" | Landmarks: "+this.known.size+" | Towns: "+this.knownTowns.size+" | View: 1.024 km";
     this.dirty=false;
   }
 }

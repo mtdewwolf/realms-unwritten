@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { biomeAt, terrainHeightAt, terrainColorAt, TERRAIN_GRID_STEP } from "./terrain";
 import { addChunkLandmarks, disposeChunkLandmarks } from "./landmarkVisuals";
+import { addChunkInfrastructure, disposeChunkInfrastructure } from "./infrastructureVisuals";
 
 export const CHUNK_SIZE=64;
 export const WORLD_CHUNKS_PER_SIDE=256;
@@ -131,6 +132,7 @@ export class ChunkedWorld {
     rocks.instanceMatrix.needsUpdate=true;
     group.add(rocks);
     addChunkLandmarks(group,cx,cz,CHUNK_SIZE,groundHeightAt);
+    addChunkInfrastructure(group,cx,cz,CHUNK_SIZE,groundHeightAt);
     return {group,geometry};
   }
   update(x:number,z:number):void{
@@ -141,6 +143,7 @@ export class ChunkedWorld {
       if(wanted.has(k))continue;
       this.scene.remove(chunk.group);
       disposeChunkLandmarks(chunk.group);
+      disposeChunkInfrastructure(chunk.group);
       chunk.group.clear();
       chunk.geometry.dispose();
       this.active.delete(k);

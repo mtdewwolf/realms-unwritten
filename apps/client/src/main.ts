@@ -5,6 +5,7 @@ import { ChunkedWorld, WORLD_HALF_SIZE, chunkCoordinate, groundHeightAt } from "
 import { biomeAt } from "./world/terrain";
 import { landmarksNear, discoverableLandmarks } from "./world/landmarks";
 import { WorldMap } from "./ui/worldMap";
+import { settlementsNear, discoverySettlements } from "./world/settlements";
 import { createAdventurer, createWolf } from "./characters/rig";
 import { mountAnimatedAsset, type AnimatedAsset, type AnimationState } from "./characters/animatedAsset";
 import { pointerSpacing, zoomFromPinch } from "./input/touchCamera";
@@ -118,6 +119,9 @@ const discoveryKey = "realms-unwritten-discoveries-v1";
 let discovered = new Set<string>();
 try { const saved=JSON.parse(localStorage.getItem(discoveryKey) || "[]"); if(Array.isArray(saved))discovered=new Set(saved.filter((id): id is string => typeof id==="string")); } catch { /* Private mode or bad data: current session only */ }
 let nextDiscoveryScan = 0;
+const settlementDiscoveryKey="realms-unwritten-settlement-discoveries-v1";
+let knownSettlements=new Set<string>();
+try {const data=JSON.parse(localStorage.getItem(settlementDiscoveryKey)||"[]");if(Array.isArray(data))knownSettlements=new Set(data.filter((id):id is string=>typeof id==="string"));}catch{/* Device-only progress */}
 let axisX = 0, axisZ = 0;
 let yaw = Math.PI / 4;
 let distance = 20;
@@ -296,6 +300,17 @@ function frame(now: number) {
   if(now>=nextDiscoveryScan){
     nextDiscoveryScan=now+650;
     const found=discoverableLandmarks(avatar.position.x,avatar.position.z,16);
+    const nearbySettlements=settlementsNear(avatar.position.x,avatar.position.z,700);
+    let newlyVisitedTown=false;
+    for(const town of discoverySettlements(avatar.position.x,avatar.position.z,28)) {
+      if(knownSettlements.has(town.id))continue;
+      knownSettlements.add(town.id);
+      atlas.recordSettlement(town);
+      newlyVisitedTown=true;
+      status.textContent="Settlement discovered: "+town.name;
+    }
+    if(newlyVisitedTown)try{localStorage.setItem(settlementDiscoveryKey,JSON.stringify([...knownSettlements]));}catch{/* Session-only */}
+    for(const town of nearbySettlements)if(knownSettlements.has(town.id))atlas.recordSettlement(town);
     let newlyDiscovered=false;
     for(const location of found){
       if(discovered.has(location.id))continue;
