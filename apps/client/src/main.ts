@@ -4,6 +4,7 @@ import { populateFrontierProps } from "./world/frontierProps";
 import { ChunkedWorld, WORLD_HALF_SIZE, chunkCoordinate, groundHeightAt } from "./world/chunkedWorld";
 import { biomeAt } from "./world/terrain";
 import { landmarksNear, discoverableLandmarks } from "./world/landmarks";
+import { WorldMap } from "./ui/worldMap";
 import { createAdventurer, createWolf } from "./characters/rig";
 import { mountAnimatedAsset, type AnimatedAsset, type AnimationState } from "./characters/animatedAsset";
 import { pointerSpacing, zoomFromPinch } from "./input/touchCamera";
@@ -112,6 +113,7 @@ const knob = document.querySelector<HTMLElement>("#knob")!;
 const status = document.querySelector<HTMLElement>("#status")!;
 const coordinates = document.querySelector<HTMLElement>("#world-coordinates")!;
 const exploration = document.querySelector<HTMLElement>("#exploration")!;
+const atlas = new WorldMap(app);
 const discoveryKey = "realms-unwritten-discoveries-v1";
 let discovered = new Set<string>();
 try { const saved=JSON.parse(localStorage.getItem(discoveryKey) || "[]"); if(Array.isArray(saved))discovered=new Set(saved.filter((id): id is string => typeof id==="string")); } catch { /* Private mode or bad data: current session only */ }
@@ -287,6 +289,7 @@ function frame(now: number) {
     }
   }
   avatar.position.y=groundHeightAt(avatar.position.x,avatar.position.z);
+  atlas.update(avatar.position.x,avatar.position.z,now);
   world.update(avatar.position.x,avatar.position.z);
   const label=biomeAt(avatar.position.x,avatar.position.z).toUpperCase()+" | CHUNK "+chunkCoordinate(avatar.position.x)+","+chunkCoordinate(avatar.position.z)+" | X "+Math.round(avatar.position.x)+" Z "+Math.round(avatar.position.z)+" | "+world.loadedChunks+" loaded";
   if(coordinates.textContent!==label) coordinates.textContent=label;
@@ -297,6 +300,7 @@ function frame(now: number) {
     for(const location of found){
       if(discovered.has(location.id))continue;
       discovered.add(location.id);
+      atlas.recordDiscovered(location);
       newlyDiscovered=true;
       status.textContent="Discovered: "+location.name;
     }
@@ -304,6 +308,7 @@ function frame(now: number) {
       try {localStorage.setItem(discoveryKey,JSON.stringify([...discovered]));} catch { /* Session-only progress */ }
     }
     const nearby=landmarksNear(avatar.position.x,avatar.position.z,450);
+    for(const point of nearby) if(discovered.has(point.id))atlas.recordDiscovered(point);
     nearby.sort((a,b)=>Math.hypot(a.x-avatar.position.x,a.z-avatar.position.z)-Math.hypot(b.x-avatar.position.x,b.z-avatar.position.z));
     const closest=nearby[0];
     const distance=closest?Math.round(Math.hypot(closest.x-avatar.position.x,closest.z-avatar.position.z)):0;
