@@ -11,3 +11,6 @@
 
 #world-coordinates{position:absolute;right:max(18px,env(safe-area-inset-right));top:58px;font-size:10px;color:#edf6dd;background:#142921b8;border-radius:8px;padding:5px 8px;pointer-events:none;font-variant-numeric:tabular-nums}
 @media(max-width:650px){#world-coordinates{top:55px;right:8px;font-size:9px;max-width:48vw}}
+
+#exploration{position:absolute;top:85px;right:max(18px,env(safe-area-inset-right));border-radius:8px;background:#142921c9;padding:6px 9px;font-size:10px;max-width:45vw;text-align:right;pointer-events:none}
+@media(max-width:650px){#exploration{top:82px;right:8px;font-size:9px}}

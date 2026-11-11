@@ -3,6 +3,7 @@ import "./style.css";
 import { populateFrontierProps } from "./world/frontierProps";
 import { ChunkedWorld, WORLD_HALF_SIZE, chunkCoordinate, groundHeightAt } from "./world/chunkedWorld";
 import { biomeAt } from "./world/terrain";
+import { landmarksNear, discoverableLandmarks } from "./world/landmarks";
 import { createAdventurer, createWolf } from "./characters/rig";
 import { mountAnimatedAsset, type AnimatedAsset, type AnimationState } from "./characters/animatedAsset";
 import { pointerSpacing, zoomFromPinch } from "./input/touchCamera";
@@ -15,6 +16,7 @@ app.innerHTML = `
   <header><strong>⚔ REALMS UNWRITTEN</strong><small>THE VERDANT REACH · ANDROID PROTOTYPE</small></header>
   <div id="status">Explore the frontier</div>
   <div id="world-coordinates">REGION 0,0</div>
+  <div id="exploration">Discover the frontier</div>
   <div id="stick"><div id="knob"></div></div>
   <div id="actions"><button id="gather">⛏<span>GATHER</span></button><button id="attack">⚔<span>ATTACK</span></button></div>
   <div id="hint">Left thumb to move · Drag open terrain to rotate · Pinch to zoom</div>
@@ -109,6 +111,11 @@ const stick = document.querySelector<HTMLElement>("#stick")!;
 const knob = document.querySelector<HTMLElement>("#knob")!;
 const status = document.querySelector<HTMLElement>("#status")!;
 const coordinates = document.querySelector<HTMLElement>("#world-coordinates")!;
+const exploration = document.querySelector<HTMLElement>("#exploration")!;
+const discoveryKey = "realms-unwritten-discoveries-v1";
+let discovered = new Set<string>();
+try { const saved=JSON.parse(localStorage.getItem(discoveryKey) || "[]"); if(Array.isArray(saved))discovered=new Set(saved.filter((id): id is string => typeof id==="string")); } catch { /* Private mode or bad data: current session only */ }
+let nextDiscoveryScan = 0;
 let axisX = 0, axisZ = 0;
 let yaw = Math.PI / 4;
 let distance = 20;
@@ -283,6 +290,25 @@ function frame(now: number) {
   world.update(avatar.position.x,avatar.position.z);
   const label=biomeAt(avatar.position.x,avatar.position.z).toUpperCase()+" | CHUNK "+chunkCoordinate(avatar.position.x)+","+chunkCoordinate(avatar.position.z)+" | X "+Math.round(avatar.position.x)+" Z "+Math.round(avatar.position.z)+" | "+world.loadedChunks+" loaded";
   if(coordinates.textContent!==label) coordinates.textContent=label;
+  if(now>=nextDiscoveryScan){
+    nextDiscoveryScan=now+650;
+    const found=discoverableLandmarks(avatar.position.x,avatar.position.z,16);
+    let newlyDiscovered=false;
+    for(const location of found){
+      if(discovered.has(location.id))continue;
+      discovered.add(location.id);
+      newlyDiscovered=true;
+      status.textContent="Discovered: "+location.name;
+    }
+    if(newlyDiscovered) {
+      try {localStorage.setItem(discoveryKey,JSON.stringify([...discovered]));} catch { /* Session-only progress */ }
+    }
+    const nearby=landmarksNear(avatar.position.x,avatar.position.z,450);
+    nearby.sort((a,b)=>Math.hypot(a.x-avatar.position.x,a.z-avatar.position.z)-Math.hypot(b.x-avatar.position.x,b.z-avatar.position.z));
+    const closest=nearby[0];
+    const distance=closest?Math.round(Math.hypot(closest.x-avatar.position.x,closest.z-avatar.position.z)):0;
+    exploration.textContent=closest?("Discoveries "+discovered.size+" | "+closest.name+" "+distance+"m"):("Discoveries "+discovered.size+" | Explore outward");
+  }
   const pitch = THREE.MathUtils.degToRad(55);
   const offset = new THREE.Vector3(
     Math.sin(yaw) * Math.cos(pitch),
