@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import "./style.css";
 import { populateFrontierProps } from "./world/frontierProps";
+import { ChunkedWorld, WORLD_HALF_SIZE, chunkCoordinate } from "./world/chunkedWorld";
 import { createAdventurer, createWolf } from "./characters/rig";
 import { mountAnimatedAsset, type AnimatedAsset, type AnimationState } from "./characters/animatedAsset";
 import { pointerSpacing, zoomFromPinch } from "./input/touchCamera";
@@ -12,6 +13,7 @@ app.innerHTML = `
   <canvas id="game"></canvas>
   <header><strong>⚔ REALMS UNWRITTEN</strong><small>THE VERDANT REACH · ANDROID PROTOTYPE</small></header>
   <div id="status">Explore the frontier</div>
+  <div id="world-coordinates">REGION 0,0</div>
   <div id="stick"><div id="knob"></div></div>
   <div id="actions"><button id="gather">⛏<span>GATHER</span></button><button id="attack">⚔<span>ATTACK</span></button></div>
   <div id="hint">Left thumb to move · Drag open terrain to rotate · Pinch to zoom</div>
@@ -31,19 +33,8 @@ const sunlight = new THREE.DirectionalLight(0xffeed0, 2.5);
 sunlight.position.set(-8, 16, 11);
 scene.add(sunlight);
 
-const ground = new THREE.Mesh(
-  new THREE.PlaneGeometry(100, 100),
-  new THREE.MeshLambertMaterial({ color: 0x547a45 })
-);
-ground.rotation.x = -Math.PI / 2;
-scene.add(ground);
-const track = new THREE.Mesh(
-  new THREE.PlaneGeometry(5, 75),
-  new THREE.MeshLambertMaterial({ color: 0x9d8f6b })
-);
-track.rotation.x = -Math.PI / 2;
-track.position.y = 0.015;
-scene.add(track);
+const world = new ChunkedWorld(scene);
+world.update(0,0);
 
 function box(w: number, h: number, d: number, color: number) {
   return new THREE.Mesh(
@@ -71,20 +62,6 @@ house(7, -9);
 house(-7, 7);
 populateFrontierProps(scene);
 
-const trunkGeo = new THREE.CylinderGeometry(0.19, 0.27, 2.1, 6);
-const leavesGeo = new THREE.ConeGeometry(1.35, 3.4, 7);
-const trunkMat = new THREE.MeshLambertMaterial({ color: 0x76553a });
-const leafMat = new THREE.MeshLambertMaterial({ color: 0x3b6541 });
-for (let i = 0; i < 125; i++) {
-  const x = Math.sin(i * 79.7) * 43;
-  const z = Math.cos(i * 37.3) * 43;
-  if (Math.abs(x) < 9 && Math.abs(z) < 15) continue;
-  const trunk = new THREE.Mesh(trunkGeo, trunkMat);
-  trunk.position.set(x, 1, z);
-  const leaves = new THREE.Mesh(leavesGeo, leafMat);
-  leaves.position.set(x, 3.1, z);
-  scene.add(trunk, leaves);
-}
 const adventurer = createAdventurer();
 const avatar = new THREE.Group();
 avatar.add(adventurer.root);
@@ -130,6 +107,7 @@ const battleInfo = document.querySelector<HTMLElement>("#battle-info")!;
 const stick = document.querySelector<HTMLElement>("#stick")!;
 const knob = document.querySelector<HTMLElement>("#knob")!;
 const status = document.querySelector<HTMLElement>("#status")!;
+const coordinates = document.querySelector<HTMLElement>("#world-coordinates")!;
 let axisX = 0, axisZ = 0;
 let yaw = Math.PI / 4;
 let distance = 20;
@@ -227,8 +205,8 @@ function dodge() {
   dodgeUntil=now+0.6;
   const direction=new THREE.Vector3(Math.sin(avatar.rotation.y),0,Math.cos(avatar.rotation.y));
   avatar.position.addScaledVector(direction,2.25);
-  avatar.position.x=THREE.MathUtils.clamp(avatar.position.x,-46,46);
-  avatar.position.z=THREE.MathUtils.clamp(avatar.position.z,-46,46);
+  avatar.position.x=THREE.MathUtils.clamp(avatar.position.x,-WORLD_HALF_SIZE+2,WORLD_HALF_SIZE-2);
+  avatar.position.z=THREE.MathUtils.clamp(avatar.position.z,-WORLD_HALF_SIZE+2,WORLD_HALF_SIZE-2);
   battleInfo.textContent="Dodged!";
 }
 document.querySelector("#attack")!.addEventListener("click", attack);
@@ -256,8 +234,8 @@ function frame(now: number) {
     const right = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw));
     const heading = right.multiplyScalar(x).addScaledVector(forward, -z).normalize();
     avatar.position.addScaledVector(heading, dt * 5.5);
-    avatar.position.x = THREE.MathUtils.clamp(avatar.position.x, -46, 46);
-    avatar.position.z = THREE.MathUtils.clamp(avatar.position.z, -46, 46);
+    avatar.position.x = THREE.MathUtils.clamp(avatar.position.x, -WORLD_HALF_SIZE+2, WORLD_HALF_SIZE-2);
+    avatar.position.z = THREE.MathUtils.clamp(avatar.position.z, -WORLD_HALF_SIZE+2, WORLD_HALF_SIZE-2);
     avatar.rotation.y = Math.atan2(heading.x, heading.z);
   }
   adventurer.update(elapsed,length>0.05 && playerHealth>0,now/1000<attackingUntil);
@@ -300,6 +278,9 @@ function frame(now: number) {
       if(playerHealth===0) battleInfo.textContent="Defeated · restart to retry";
     }
   }
+  world.update(avatar.position.x,avatar.position.z);
+  const label="CHUNK "+chunkCoordinate(avatar.position.x)+","+chunkCoordinate(avatar.position.z)+" | X "+Math.round(avatar.position.x)+" Z "+Math.round(avatar.position.z)+" | "+world.loadedChunks+" loaded";
+  if(coordinates.textContent!==label) coordinates.textContent=label;
   const pitch = THREE.MathUtils.degToRad(55);
   const offset = new THREE.Vector3(
     Math.sin(yaw) * Math.cos(pitch),
