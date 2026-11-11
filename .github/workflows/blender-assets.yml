@@ -20,11 +20,14 @@ jobs:
       - name: Install Blender
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends blender
+          sudo apt-get install -y --no-install-recommends blender python3-numpy
           blender --version
+          /usr/bin/python3 -c 'import numpy; print("System NumPy", numpy.__version__)'
       - name: Generate original rigged characters
         run: |
-          blender --background --factory-startup --python tools/blender/generate_characters.py -- --out build/assets
+          blender --background --factory-startup --python-exit-code 1 --python tools/blender/generate_characters.py -- --out build/assets
+          test -s build/assets/adventurer.glb
+          test -s build/assets/wolf.glb
       - name: Validate GLB skin and animations
         run: python3 tools/blender/validate_glb.py build/assets
       - name: Generate hashes
