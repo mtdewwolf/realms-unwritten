@@ -1,7 +1,8 @@
 import * as THREE from "three";
 import "./style.css";
 import { populateFrontierProps } from "./world/frontierProps";
-import { ChunkedWorld, WORLD_HALF_SIZE, chunkCoordinate } from "./world/chunkedWorld";
+import { ChunkedWorld, WORLD_HALF_SIZE, chunkCoordinate, groundHeightAt } from "./world/chunkedWorld";
+import { biomeAt } from "./world/terrain";
 import { createAdventurer, createWolf } from "./characters/rig";
 import { mountAnimatedAsset, type AnimatedAsset, type AnimationState } from "./characters/animatedAsset";
 import { pointerSpacing, zoomFromPinch } from "./input/touchCamera";
@@ -278,8 +279,9 @@ function frame(now: number) {
       if(playerHealth===0) battleInfo.textContent="Defeated · restart to retry";
     }
   }
+  avatar.position.y=groundHeightAt(avatar.position.x,avatar.position.z);
   world.update(avatar.position.x,avatar.position.z);
-  const label="CHUNK "+chunkCoordinate(avatar.position.x)+","+chunkCoordinate(avatar.position.z)+" | X "+Math.round(avatar.position.x)+" Z "+Math.round(avatar.position.z)+" | "+world.loadedChunks+" loaded";
+  const label=biomeAt(avatar.position.x,avatar.position.z).toUpperCase()+" | CHUNK "+chunkCoordinate(avatar.position.x)+","+chunkCoordinate(avatar.position.z)+" | X "+Math.round(avatar.position.x)+" Z "+Math.round(avatar.position.z)+" | "+world.loadedChunks+" loaded";
   if(coordinates.textContent!==label) coordinates.textContent=label;
   const pitch = THREE.MathUtils.degToRad(55);
   const offset = new THREE.Vector3(

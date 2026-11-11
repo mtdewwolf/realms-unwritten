@@ -1,61 +1,83 @@
 import * as THREE from "three";
+import { biomeAt, terrainHeightAt, terrainColorAt, TERRAIN_GRID_STEP } from "./terrain";
 
-export const CHUNK_SIZE = 64;
-export const WORLD_CHUNKS_PER_SIDE = 256;
-export const WORLD_HALF_SIZE = CHUNK_SIZE * WORLD_CHUNKS_PER_SIDE / 2;
-export const ACTIVE_CHUNK_RADIUS = 2;
-
-export function chunkCoordinate(x: number): number {
-  return Math.floor(x / CHUNK_SIZE);
+export const CHUNK_SIZE=64;
+export const WORLD_CHUNKS_PER_SIDE=256;
+export const WORLD_HALF_SIZE=CHUNK_SIZE*WORLD_CHUNKS_PER_SIDE/2;
+export const ACTIVE_CHUNK_RADIUS=2;
+export function chunkCoordinate(x:number):number {return Math.floor(x/CHUNK_SIZE);}
+export function chunkKey(x:number,z:number):string{return x+":"+z;}
+export function chunkSeed(x:number,z:number):number {
+  let s=(Math.imul(x,374761393)^Math.imul(z,668265263)^0x9e3779b9)|0;
+  s=Math.imul(s^s>>>13,1274126177);
+  return (s^s>>>16)>>>0;
 }
-export function chunkKey(x: number, z: number): string {
-  return x + ":" + z;
-}
-export function chunkSeed(x: number, z: number): number {
-  let s = (Math.imul(x, 374761393) ^ Math.imul(z, 668265263) ^ 0x9e3779b9) | 0;
-  s = Math.imul(s ^ s >>> 13, 1274126177);
-  return (s ^ s >>> 16) >>> 0;
-}
-export function seededRandom(seed: number): () => number {
-  let state = seed >>> 0;
-  return () => {
-    state = (state + 0x6d2b79f5) >>> 0;
-    let x = Math.imul(state ^ state >>> 15, 1 | state);
-    x ^= x + Math.imul(x ^ x >>> 7, 61 | x);
-    return ((x ^ x >>> 14) >>> 0) / 4294967296;
+export function seededRandom(seed:number):()=>number {
+  let state=seed>>>0;
+  return ()=>{
+    state=(state+0x6d2b79f5)>>>0;
+    let x=Math.imul(state^state>>>15,1|state);
+    x^=x+Math.imul(x^x>>>7,61|x);
+    return ((x^x>>>14)>>>0)/4294967296;
   };
 }
-export function activeChunkCoordinates(x: number, z: number, radius=ACTIVE_CHUNK_RADIUS): Array<[number,number]> {
-  const cx=chunkCoordinate(x), cz=chunkCoordinate(z);
-  const result: Array<[number,number]> = [];
-  for(let dz=-radius;dz<=radius;dz++) {
-    for(let dx=-radius;dx<=radius;dx++) {
-      const tx=cx+dx,tz=cz+dz;
-      if(tx>=-128 && tx<128 && tz>=-128 && tz<128) result.push([tx,tz]);
-    }
+export function activeChunkCoordinates(x:number,z:number,radius=ACTIVE_CHUNK_RADIUS):Array<[number,number]> {
+  const cx=chunkCoordinate(x),cz=chunkCoordinate(z);
+  const result:Array<[number,number]>=[];
+  for(let dz=-radius;dz<=radius;dz++)for(let dx=-radius;dx<=radius;dx++){
+    const tx=cx+dx,tz=cz+dz;
+    if(tx>=-128&&tx<128&&tz>=-128&&tz<128)result.push([tx,tz]);
   }
   return result;
 }
-/**
- * Bounded near-player rendering for an addressable 16.384km square.
- * Source models, materials and geometry are shared; only instance transforms vary.
- */
+
+/** Build a piecewise-linear heightfield in the same coordinate system used by collision. */
+export function buildTerrainChunkGeometry(cx:number,cz:number):THREE.BufferGeometry {
+  const sides=CHUNK_SIZE/TERRAIN_GRID_STEP;
+  const positions:number[]=[],colors:number[]=[],indices:number[]=[];
+  for(let z=0;z<=sides;z++){
+    for(let x=0;x<=sides;x++){
+      const lx=x*TERRAIN_GRID_STEP,lz=z*TERRAIN_GRID_STEP;
+      const wx=cx*CHUNK_SIZE+lx,wz=cz*CHUNK_SIZE+lz;
+      const y=terrainHeightAt(wx,wz);
+      positions.push(lx,y,lz);
+      colors.push(...terrainColorAt(wx,wz));
+    }
+  }
+  for(let z=0;z<sides;z++)for(let x=0;x<sides;x++){
+    const a=z*(sides+1)+x,b=a+1,c=a+sides+1,d=c+1;
+    indices.push(a,c,b,b,c,d);
+  }
+  const geometry=new THREE.BufferGeometry();
+  geometry.setAttribute("position",new THREE.Float32BufferAttribute(positions,3));
+  geometry.setAttribute("color",new THREE.Float32BufferAttribute(colors,3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  return geometry;
+}
+/** Matches the actual triangles in buildTerrainChunkGeometry, not just raw noise. */
+export function groundHeightAt(x:number,z:number):number{
+  const cx=chunkCoordinate(x),cz=chunkCoordinate(z);
+  const localX=x-cx*CHUNK_SIZE,localZ=z-cz*CHUNK_SIZE;
+  const col=Math.min(15,Math.floor(localX/TERRAIN_GRID_STEP));
+  const row=Math.min(15,Math.floor(localZ/TERRAIN_GRID_STEP));
+  const u=(localX-col*TERRAIN_GRID_STEP)/TERRAIN_GRID_STEP;
+  const v=(localZ-row*TERRAIN_GRID_STEP)/TERRAIN_GRID_STEP;
+  const x0=cx*CHUNK_SIZE+col*TERRAIN_GRID_STEP;
+  const z0=cz*CHUNK_SIZE+row*TERRAIN_GRID_STEP;
+  const h00=terrainHeightAt(x0,z0),h10=terrainHeightAt(x0+TERRAIN_GRID_STEP,z0);
+  const h01=terrainHeightAt(x0,z0+TERRAIN_GRID_STEP),h11=terrainHeightAt(x0+TERRAIN_GRID_STEP,z0+TERRAIN_GRID_STEP);
+  return u+v<=1 ? h00+(h10-h00)*u+(h01-h00)*v : h11+(h01-h11)*(1-u)+(h10-h11)*(1-v);
+}
 export class ChunkedWorld {
-  private readonly active=new Map<string,THREE.Group>();
-  private readonly groundGeo=new THREE.PlaneGeometry(CHUNK_SIZE,CHUNK_SIZE);
-  private readonly terrainMat=[
-    new THREE.MeshLambertMaterial({color:0x557a48}),
-    new THREE.MeshLambertMaterial({color:0x707950}),
-    new THREE.MeshLambertMaterial({color:0x486a61})
-  ];
-  private readonly roadGeo=new THREE.PlaneGeometry(2.5,CHUNK_SIZE);
-  private readonly roadMat=new THREE.MeshLambertMaterial({color:0x9d8f6b});
-  private readonly trunkGeo=new THREE.CylinderGeometry(0.2,0.3,2.1,6);
-  private readonly leafGeo=new THREE.ConeGeometry(1.35,3.3,7);
-  private readonly rockGeo=new THREE.DodecahedronGeometry(.8,0);
+  private readonly active=new Map<string,{group:THREE.Group;geometry:THREE.BufferGeometry}>();
+  private readonly groundMaterial=new THREE.MeshLambertMaterial({vertexColors:true,side:THREE.FrontSide});
+  private readonly trunkGeo=new THREE.CylinderGeometry(.2,.3,2.1,6);
+  private readonly foliageGeo=new THREE.ConeGeometry(1.35,3.3,7);
+  private readonly stoneGeo=new THREE.DodecahedronGeometry(.8,0);
   private readonly trunkMat=new THREE.MeshLambertMaterial({color:0x76553a});
-  private readonly rockMat=new THREE.MeshLambertMaterial({color:0x91938b,flatShading:true});
-  private readonly leavesMat=[
+  private readonly stoneMat=new THREE.MeshLambertMaterial({color:0x91938b,flatShading:true});
+  private readonly foliageMat=[
     new THREE.MeshLambertMaterial({color:0x3c6944}),
     new THREE.MeshLambertMaterial({color:0x667940}),
     new THREE.MeshLambertMaterial({color:0x356b60})
@@ -63,47 +85,43 @@ export class ChunkedWorld {
   private center="";
   constructor(private readonly scene:THREE.Scene){}
   get loadedChunks():number{return this.active.size;}
-  private create(cx:number,cz:number):THREE.Group {
+  private create(cx:number,cz:number):{group:THREE.Group;geometry:THREE.BufferGeometry}{
     const group=new THREE.Group();
     group.position.set(cx*CHUNK_SIZE,0,cz*CHUNK_SIZE);
-    const region=chunkSeed(Math.floor(cx/8),Math.floor(cz/8))%3;
-    const ground=new THREE.Mesh(this.groundGeo,this.terrainMat[region]);
-    ground.rotation.x=-Math.PI/2;
-    ground.position.set(CHUNK_SIZE/2,0,CHUNK_SIZE/2);
-    group.add(ground);
-    if(cx===-1||cx===0){
-      const road=new THREE.Mesh(this.roadGeo,this.roadMat);
-      road.rotation.x=-Math.PI/2;
-      road.position.set(cx===-1?CHUNK_SIZE-1.25:1.25,.016,CHUNK_SIZE/2);
-      group.add(road);
-    }
+    const geometry=buildTerrainChunkGeometry(cx,cz);
+    group.add(new THREE.Mesh(geometry,this.groundMaterial));
     const rng=seededRandom(chunkSeed(cx,cz));
     const dummy=new THREE.Object3D();
     const trunks=new THREE.InstancedMesh(this.trunkGeo,this.trunkMat,20);
-    const crowns=new THREE.InstancedMesh(this.leafGeo,this.leavesMat[region],20);
+    const crowns=new THREE.InstancedMesh(this.foliageGeo,this.foliageMat[
+      biomeAt(cx*CHUNK_SIZE+32,cz*CHUNK_SIZE+32)==="woodland"?0:
+      biomeAt(cx*CHUNK_SIZE+32,cz*CHUNK_SIZE+32)==="meadow"?1:2
+    ],20);
     for(let i=0;i<20;i++){
-      let x=4+rng()*(CHUNK_SIZE-8),z=4+rng()*(CHUNK_SIZE-8);
-      const wx=cx*CHUNK_SIZE+x,wz=cz*CHUNK_SIZE+z;
-      // Keep the starting settlement and the axial road clear.
-      if(Math.abs(wx)<11 && Math.abs(wz)<17) x=wx<0?4:CHUNK_SIZE-4;
-      if(Math.abs(wx)<4) x=wx<0?4:CHUNK_SIZE-4;
+      let x=4+rng()*56,z=4+rng()*56;
+      let wx=cx*CHUNK_SIZE+x,wz=cz*CHUNK_SIZE+z;
+      // Leave the original starter buildings and central approach clear.
+      if(Math.abs(wx)<15&&Math.abs(wz)<20){x=wx<0?4:60;wx=cx*CHUNK_SIZE+x;}
+      if(Math.abs(wx)<4){x=wx<0?4:60;wx=cx*CHUNK_SIZE+x;}
       const scale=.75+rng()*.5;
       dummy.scale.setScalar(scale);
-      dummy.position.set(x,1.05*scale,z);
+      dummy.position.set(x,groundHeightAt(wx,wz)+1.05*scale,z);
       dummy.rotation.y=rng()*Math.PI*2;
       dummy.updateMatrix();
       trunks.setMatrixAt(i,dummy.matrix);
-      dummy.position.y=3.15*scale;
+      dummy.position.y=groundHeightAt(wx,wz)+3.15*scale;
       dummy.updateMatrix();
       crowns.setMatrixAt(i,dummy.matrix);
     }
     trunks.instanceMatrix.needsUpdate=true;
     crowns.instanceMatrix.needsUpdate=true;
     group.add(trunks,crowns);
-    const rocks=new THREE.InstancedMesh(this.rockGeo,this.rockMat,8);
+    const rocks=new THREE.InstancedMesh(this.stoneGeo,this.stoneMat,8);
     for(let i=0;i<8;i++){
-      dummy.position.set(3+rng()*(CHUNK_SIZE-6),.25,3+rng()*(CHUNK_SIZE-6));
+      const x=3+rng()*58,z=3+rng()*58;
+      const wx=cx*CHUNK_SIZE+x,wz=cz*CHUNK_SIZE+z;
       const size=.3+rng()*.55;
+      dummy.position.set(x,groundHeightAt(wx,wz)+.25*size,z);
       dummy.scale.set(size,size*.6,size);
       dummy.rotation.y=rng()*Math.PI;
       dummy.updateMatrix();
@@ -111,25 +129,25 @@ export class ChunkedWorld {
     }
     rocks.instanceMatrix.needsUpdate=true;
     group.add(rocks);
-    return group;
+    return {group,geometry};
   }
-  update(x:number,z:number):void {
+  update(x:number,z:number):void{
     const cx=chunkCoordinate(x),cz=chunkCoordinate(z),key=chunkKey(cx,cz);
     if(this.center===key)return;
-    const coords=activeChunkCoordinates(x,z);
-    const wanted=new Set(coords.map(([a,b])=>chunkKey(a,b)));
-    for(const [k,g] of this.active){
+    const wanted=new Set(activeChunkCoordinates(x,z).map(([a,b])=>chunkKey(a,b)));
+    for(const [k,chunk] of this.active){
       if(wanted.has(k))continue;
-      this.scene.remove(g);
-      g.clear();
+      this.scene.remove(chunk.group);
+      chunk.group.clear();
+      chunk.geometry.dispose();
       this.active.delete(k);
     }
-    for(const [a,b] of coords){
+    for(const [a,b] of activeChunkCoordinates(x,z)){
       const k=chunkKey(a,b);
       if(this.active.has(k))continue;
-      const group=this.create(a,b);
-      this.active.set(k,group);
-      this.scene.add(group);
+      const chunk=this.create(a,b);
+      this.active.set(k,chunk);
+      this.scene.add(chunk.group);
     }
     this.center=key;
   }
