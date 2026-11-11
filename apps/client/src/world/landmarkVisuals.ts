@@ -1,12 +1,11 @@
 import * as THREE from "three";
-import { groundHeightAt } from "./chunkedWorld";
 import { landmarkInChunk, type Landmark } from "./landmarks";
 
 /** Original, inexpensive world-space landmark blockouts. */
 const material = {
   stone:new THREE.MeshLambertMaterial({color:0x737d75,flatShading:true}),
   darkStone:new THREE.MeshLambertMaterial({color:0x4b5452,flatShading:true}),
-  ore:new THREE.MeshLambertMaterial({color:0x607b92,metalness:0.25}),
+  ore:new THREE.MeshLambertMaterial({color:0x607b92}),
   amber:new THREE.MeshBasicMaterial({color:0xe6b56b}),
   earth:new THREE.MeshLambertMaterial({color:0x4e3a31}),
   bone:new THREE.MeshLambertMaterial({color:0xc7b7a0}),
@@ -50,10 +49,10 @@ function shape(poi:Landmark):THREE.Group {
   group.userData.landmarkId=poi.id;
   return group;
 }
-export function addChunkLandmarks(group:THREE.Group,cx:number,cz:number,chunkSize=64):void{
+export function addChunkLandmarks(group:THREE.Group,cx:number,cz:number,chunkSize:number,heightAt:(x:number,z:number)=>number):void{
   for(const poi of landmarkInChunk(cx,cz,chunkSize)){
     const model=shape(poi);
-    model.position.set(poi.x-cx*chunkSize,groundHeightAt(poi.x,poi.z),poi.z-cz*chunkSize);
+    model.position.set(poi.x-cx*chunkSize,heightAt(poi.x,poi.z),poi.z-cz*chunkSize);
     model.name=poi.id;
     group.add(model);
   }

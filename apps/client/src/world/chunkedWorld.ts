@@ -130,7 +130,7 @@ export class ChunkedWorld {
     }
     rocks.instanceMatrix.needsUpdate=true;
     group.add(rocks);
-    addChunkLandmarks(group,cx,cz,CHUNK_SIZE);
+    addChunkLandmarks(group,cx,cz,CHUNK_SIZE,groundHeightAt);
     return {group,geometry};
   }
   update(x:number,z:number):void{
