@@ -2,6 +2,7 @@ import * as THREE from "three";
 import "./style.css";
 import { populateFrontierProps } from "./world/frontierProps";
 import { createAdventurer, createWolf } from "./characters/rig";
+import { mountAnimatedAsset, type AnimatedAsset, type AnimationState } from "./characters/animatedAsset";
 import { pointerSpacing, zoomFromPinch } from "./input/touchCamera";
 import { PLAYER_MAX_STAMINA, WOLF_MAX_HEALTH, ATTACK_STAMINA, DODGE_STAMINA, regenerateStamina, useStamina, withinAttackRange } from "./gameplay/combat";
 
@@ -85,11 +86,21 @@ for (let i = 0; i < 125; i++) {
   scene.add(trunk, leaves);
 }
 const adventurer = createAdventurer();
-const avatar = adventurer.root;
+const avatar = new THREE.Group();
+avatar.add(adventurer.root);
 scene.add(avatar);
-const wolf = createWolf();
+const wolf = new THREE.Group();
+const fallbackWolf = createWolf();
+wolf.add(fallbackWolf);
 wolf.position.set(5, 0, 5);
 scene.add(wolf);
+let playerAsset: AnimatedAsset | null = null;
+let wolfAsset: AnimatedAsset | null = null;
+mountAnimatedAsset(avatar, adventurer.root, "/assets/adventurer.glb", ["idle","walk","attack","dodge"])
+  .then(asset => { playerAsset = asset; status.textContent = asset.loaded ? "Adventurer GLB loaded" : "Adventurer fallback active"; });
+mountAnimatedAsset(wolf, fallbackWolf, "/assets/wolf.glb", ["idle","walk","attack","death"])
+  .then(asset => { wolfAsset = asset; if(!asset.loaded) console.warn("Wolf GLB unavailable"); });
+let wolfAttackAnimationUntil = 0;
 
 const warningRing = new THREE.Mesh(
   new THREE.RingGeometry(1.05, 1.26, 40),
@@ -201,7 +212,10 @@ function attack() {
     wolfHealth=Math.max(0,wolfHealth-20);
     battleInfo.textContent=wolfHealth>0?"Sword hit · 20 damage":"Wolf defeated!";
     wolfDisplay.value=wolfHealth;
-    if(!wolfHealth) {wolf.visible=false;warningRing.visible=false;}
+    if(!wolfHealth) {
+      warningRing.visible=false;
+      if (!wolfAsset?.loaded) wolf.visible=false;
+    }
   } else battleInfo.textContent="Too far from the wolf";
 }
 function dodge() {
@@ -247,6 +261,16 @@ function frame(now: number) {
     avatar.rotation.y = Math.atan2(heading.x, heading.z);
   }
   adventurer.update(elapsed,length>0.05 && playerHealth>0,now/1000<attackingUntil);
+  const playerState: AnimationState = now/1000<attackingUntil ? "attack" :
+    now/1000<dodgeUntil ? "dodge" : length>0.05 && playerHealth>0 ? "walk" : "idle";
+  playerAsset?.setState(playerState);
+  playerAsset?.update(dt);
+  const wolfDistance = Math.hypot(avatar.position.x-wolf.position.x,avatar.position.z-wolf.position.z);
+  const wolfState: AnimationState = wolfHealth<=0 ? "death" :
+    now/1000<wolfAttackAnimationUntil ? "attack" :
+    wolfStrikeAt>0 ? "idle" : wolfDistance<7 && wolfDistance>2.2 ? "walk" : "idle";
+  wolfAsset?.setState(wolfState);
+  wolfAsset?.update(dt);
   if(wolfHealth>0){
     const dx=avatar.position.x-wolf.position.x, dz=avatar.position.z-wolf.position.z;
     const range=Math.hypot(dx,dz);
@@ -270,6 +294,7 @@ function frame(now: number) {
         hpDisplay.value=playerHealth;
         battleInfo.textContent="Wolf bite · 12 damage";
       } else battleInfo.textContent="Wolf attack missed!";
+      wolfAttackAnimationUntil=now/1000+0.6;
       wolfStrikeAt=0;
       nextWolfAttackAt=now/1000+1.5;
       if(playerHealth===0) battleInfo.textContent="Defeated · restart to retry";

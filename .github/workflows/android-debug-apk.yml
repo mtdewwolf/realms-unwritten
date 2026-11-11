@@ -32,6 +32,15 @@ jobs:
         run: |
           bun run check
           bun test
+      - name: Install Blender export dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends blender python3-numpy
+      - name: Generate playable character assets
+        run: |
+          mkdir -p apps/client/public/assets
+          blender --background --factory-startup --python-exit-code 1 --python tools/blender/generate_characters.py -- --out apps/client/public/assets
+          python3 tools/blender/validate_glb.py apps/client/public/assets
       - name: Build web client
         run: bun run build
       - name: Create native Android project
