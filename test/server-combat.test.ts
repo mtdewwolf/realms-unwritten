@@ -15,8 +15,10 @@ describe("server-authoritative shared wolf encounter",()=>{
     expect(parseAction({type:"action",seq:1,action:"teleport"})).toBeNull();
     expect(combat.action("a",{type:"action",seq:1,action:"attack",target:"bad"})).toBeNull();
     expect(combat.wolf.health).toBe(60);
-    expect(combat.action("a",{type:"action",seq:1,action:"attack",target:WOLF_ID})?.ok).toBe(false);
-    expect(combat.wolf.health).toBe(60);
+    expect(combat.action("a",{type:"action",seq:1,action:"attack",target:WOLF_ID})?.ok).toBe(true);
+    expect(combat.wolf.health).toBe(40);
+    expect(combat.action("a",{type:"action",seq:1,action:"attack",target:WOLF_ID})?.reason).toBe("stale action");
+    expect(combat.wolf.health).toBe(40);
   });
   test("two players share one wolf HP and cooldown is enforced",()=>{
     const {combat}=setup();
