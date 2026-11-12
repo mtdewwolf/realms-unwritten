@@ -82,7 +82,27 @@ async function run(){
   first.socket.send(JSON.stringify({type:"inventory"}));
   const bag=await inventoryPromise;
   if(bag.coins!==0||bag.items.length!==0)throw Error("New guest inventory not empty");
-  console.log("PASS multiplayer smoke: movements, shared wolf, rejected forged hit, inventory read");
+  const waitFor=(socket:WebSocket,type:string,action?:string)=>new Promise<any>((resolve,reject)=>{
+    const timer=setTimeout(()=>reject(new Error("Quest response timeout: "+type)),3000);
+    const listener=(e:MessageEvent)=>{
+      const packet=JSON.parse(String(e.data));
+      if(packet.type===type&&(action===undefined||packet.action===action)){
+        socket.removeEventListener("message",listener);clearTimeout(timer);resolve(packet);
+      }
+    };
+    socket.addEventListener("message",listener);
+  });
+  const accepted=waitFor(second.socket,"quest_result","accept");
+  second.socket.send(JSON.stringify({type:"quest",action:"accept",id:"verdant-wolf-hunt"}));
+  if(!(await accepted).ok)throw Error("Starter quest was not accepted");
+  const status=waitFor(second.socket,"quest_status");
+  second.socket.send(JSON.stringify({type:"quest",action:"status"}));
+  const quest=await status;
+  if(quest.stage!=="active"||quest.kills!==0)throw Error("Quest did not start at zero progress");
+  const early=waitFor(second.socket,"quest_result","turnin");
+  second.socket.send(JSON.stringify({type:"quest",action:"turnin"}));
+  if((await early).ok)throw Error("Early turn-in incorrectly succeeded");
+  console.log("PASS multiplayer smoke: movement, shared wolf, inventory, quest acceptance and rejected early reward");
 }
 try{await run();}
 finally{

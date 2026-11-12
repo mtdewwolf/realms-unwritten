@@ -42,3 +42,15 @@
 .bag-item{display:flex;justify-content:space-between;padding:9px 7px;border-bottom:1px solid #71887677}
 .bag-note{font-size:11px;color:#c0d2c6;line-height:1.5}
 @media(max-width:700px){#inventory-toggle{left:8px;top:88px;padding:6px 9px}}
+
+#quest-toggle{position:absolute;left:17px;top:132px;z-index:15;background:#304934ed;color:#fff2cd;border:1px solid #ccbf81;border-radius:10px;padding:7px 12px;font-weight:700;font-size:11px}
+#quest-panel{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(90vw,400px);max-height:85vh;overflow:auto;z-index:34;background:#172c26f8;border:2px solid #c4b77e;border-radius:14px;padding:17px;color:#f6f0d9;box-shadow:0 15px 70px #000a}
+#quest-panel[hidden],#quest-panel button[hidden]{display:none}
+#quest-panel .quest-heading{display:flex;justify-content:space-between;align-items:center}
+#quest-panel .quest-heading button,.quest-actions button{background:#385c43;color:#fff7de;border:1px solid #b2b58a;border-radius:8px;padding:9px 12px;touch-action:manipulation}
+#quest-panel h3{font-size:20px;margin:15px 0 6px}
+#quest-panel p{font-size:13px;line-height:1.5}
+#quest-panel #quest-state{font-weight:700;color:#f5dc9d}
+#quest-panel .quest-actions{display:flex;gap:8px}
+#quest-panel .quest-note{color:#c7d1b8;font-size:11px}
+@media(max-width:700px){#quest-toggle{left:8px;top:126px;font-size:10px;padding:6px 9px}}
