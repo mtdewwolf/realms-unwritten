@@ -13,7 +13,7 @@ describe("server-authoritative shared wolf encounter",()=>{
   test("invalid or stale actions cannot mutate wolf",()=>{
     const {combat}=setup();
     expect(parseAction({type:"action",seq:1,action:"teleport"})).toBeNull();
-    expect(combat.action("a",{type:"action",seq:1,action:"attack",target:"bad"})?.ok).toBe(false);
+    expect(combat.action("a",{type:"action",seq:1,action:"attack",target:"bad"})).toBeNull();
     expect(combat.wolf.health).toBe(60);
     expect(combat.action("a",{type:"action",seq:1,action:"attack",target:WOLF_ID})?.ok).toBe(false);
     expect(combat.wolf.health).toBe(60);
