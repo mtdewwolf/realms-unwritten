@@ -7,6 +7,7 @@ import {WorldSimulation,view} from "./simulation";
 import {CombatSimulation} from "./combat";
 import {InventoryStore} from "./inventory";
 import {QuestStore,closeToGuard,parseQuestCommand} from "./quests";
+import {ProgressionStore} from "./progression";
 import {PROTOCOL_VERSION,SIMULATION_HZ,SNAPSHOT_HZ,validateHello,type ServerMessage} from "./protocol";
 
 const dbFile=process.env.WORLD_DB_PATH||"data/realms-world.sqlite";
@@ -20,7 +21,8 @@ const saveCharacter=db.query("UPDATE characters SET x=?,z=?,updated_at=? WHERE i
 const world=new WorldSimulation();
 const combat=new CombatSimulation(world);
 const inventory=new InventoryStore(db);
-const quests=new QuestStore(db);
+const progression=new ProgressionStore(db);
+const quests=new QuestStore(db,progression);
 type Session={playerId:string|null; token:string|null; lastInputAt:number;messages:number; windowStart:number};
 const socketByPlayer=new Map<string,ServerWebSocket<Session>>();
 const hash=(token:string)=>createHash("sha256").update(token).digest("hex");
@@ -33,6 +35,7 @@ combat.onWolfDefeated=(eventId,contributors)=>{
     send(ws,reward);
     send(ws,inventory.read(id));
     if(quests.recordWolfKill(id,eventId))send(ws,quests.status(id));
+    if(progression.grantWolfKill(id,eventId))send(ws,progression.read(id));
   }
 };
 const save=(id:string)=>{
@@ -98,6 +101,7 @@ const server=Bun.serve<Session>({
         send(ws,{type:"welcome",protocol:PROTOCOL_VERSION,id:stored.id,token,player:view(player)});
         send(ws,inventory.read(stored.id));
         send(ws,quests.status(stored.id));
+        send(ws,progression.read(stored.id));
         return;
       }
       if((packet as {type?:unknown})?.type==="quest"){
@@ -114,7 +118,14 @@ const server=Bun.serve<Session>({
         const ok=action==="accept"?quests.accept(id):quests.turnin(id);
         send(ws,{type:"quest_result",action,ok,reason:ok?undefined:action==="accept"?"Quest already accepted":"Defeat three wolves before turning in"});
         send(ws,quests.status(id));
-        if(ok&&action==="turnin")send(ws,inventory.read(id));
+        if(ok&&action==="turnin"){
+          send(ws,inventory.read(id));
+          send(ws,progression.read(id));
+        }
+        return;
+      }
+      if((packet as {type?:unknown})?.type==="progression"){
+        send(ws,progression.read(ws.data.playerId));
         return;
       }
       if((packet as {type?:unknown})?.type==="inventory"){
