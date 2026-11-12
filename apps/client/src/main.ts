@@ -6,6 +6,7 @@ import { biomeAt } from "./world/terrain";
 import { landmarksNear, discoverableLandmarks } from "./world/landmarks";
 import { WorldMap } from "./ui/worldMap";
 import { MultiplayerClient, type ServerWolf, type ServerVitals, type CombatActionResult } from "./multiplayer/client";
+import { InventoryPanel } from "./ui/inventory";
 import { settlementsNear, discoverySettlements } from "./world/settlements";
 import { createAdventurer, createWolf } from "./characters/rig";
 import { mountAnimatedAsset, type AnimatedAsset, type AnimationState } from "./characters/animatedAsset";
@@ -116,6 +117,8 @@ const status = document.querySelector<HTMLElement>("#status")!;
 const coordinates = document.querySelector<HTMLElement>("#world-coordinates")!;
 const exploration = document.querySelector<HTMLElement>("#exploration")!;
 const atlas = new WorldMap(app);
+const inventoryPanel=new InventoryPanel(app);
+inventoryPanel.button.addEventListener("click",()=>multiplayer.requestInventory());
 let onlineWolf:ServerWolf|null=null;
 let lastServerStrikePhase="";
 const multiplayer = new MultiplayerClient(scene, avatar,
@@ -146,7 +149,10 @@ const multiplayer = new MultiplayerClient(scene, avatar,
     wolf.position.set(5,0,5);
     wolf.visible=wolfHealth>0;
     warningRing.visible=false;
-  }
+    inventoryPanel.offline();
+  },
+  state=>inventoryPanel.update(state),
+  reward=>{battleInfo.textContent="Loot earned: "+reward.items.map(item=>item.name).join(", ")+" +"+reward.coins+" coins";}
 );
 const multiplayerPanel=document.createElement("div");
 multiplayerPanel.id="multiplayer-panel";

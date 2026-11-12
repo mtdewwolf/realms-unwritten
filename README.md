@@ -51,7 +51,7 @@ Status meanings: **Implemented** = present in source and exercised by automated 
 | Real accounts / characters | **Planned** | No login, recovery, selection, multiple slots |
 | Persistent shared world | **Planned** | No authoritative world mutation/structure ownership |
 | Server-authoritative combat/AI | **Prototype** | One synchronized Bun wolf encounter; no broader AI/spawn/loot system |
-| Inventory, equipment, loot | **Planned** | No inventory database or gameplay |
+| Inventory, equipment, loot | **Prototype** | Persistent server-owned Wolf Pelts, Fangs and coins; no equipment |
 | Skills, XP, leveling, classes | **Planned** | No character progression |
 | Gathering, crafting, economy | **Planned** | Gather button currently reports feature is pending |
 | NPC dialogue, quests, merchants | **Planned** | Towns are visual blockouts, not interactive services |
@@ -214,7 +214,7 @@ Server entry point: `apps/server/src/index.ts`. Core movement: `simulation.ts`. 
 - `GET /ws` with WebSocket upgrade: multiplayer connection.
 - Default port: **3001**; configurable via `PORT`.
 - Bind address: `0.0.0.0` by default; override via `HOST`.
-- Protocol version: **2** (client/server must use matching builds).
+- Protocol version: **3** (client/server must use matching builds).
 - Clients send `hello` with an optional existing guest token and optional sanitized display name; server sends `welcome` with player ID, token, initial position.
 - Clients send numbered movement vectors, not positions; server clamps speed and world bounds.
 - Server returns `snapshot` containing own authoritative position, acknowledgment sequence and nearby players.
@@ -238,6 +238,10 @@ Example messages (illustrative):
 ### Online starter wolf encounter
 
 When connected to a protocol v2 server, **Bun owns the wolf and player combat vitals**. Clients send `action` packets with an increasing sequence and target ID; the server checks range, stamina, cooldown and health before updating a single shared wolf. Relevant nearby snapshots carry its position, state and remaining HP. The wolf respawns eight seconds after defeat; an incapacitated player respawns after five seconds. These are prototype rules, without loot or XP. See [Authoritative Combat](docs/AUTHORITATIVE_COMBAT.md).
+
+### Server-owned wolf loot and inventory
+
+A successful shared wolf kill grants each online damage contributor one **Wolf Pelt**, one **Wolf Fang**, and **five coins**. Bun creates the grant and records a SQLite receipt, stack quantities, and wallet balance inside a transaction. The Android **BAG** shows server inventory after reconnect. Offline combat awards nothing; equipment, selling and crafting are not implemented. See [Inventory and Loot](docs/INVENTORY_LOOT.md).
 
 ### Guest persistence
 
@@ -447,6 +451,7 @@ Existing Bun test files cover:
 | `test/world-map.test.ts` | Map projection, fog-cell addressing and compass guidance |
 | `test/server-simulation.test.ts` | Authoritative movement, sequence rejection, bounds and proximity |
 | `test/server-combat.test.ts` | Shared wolf health, range/cooldown/dodge validation, respawn |
+| `test/inventory.test.ts` | Atomic reward grants, duplicate prevention and eligibility |
 
 Focused runs:
 
@@ -481,7 +486,7 @@ Run this in addition to `bun test`; it is not a normal `test/*.test.ts` unit tes
    curl -fsS http://127.0.0.1:3001/health
    ```
 
-3. Verify response has `"ok":true`, protocol version `2`, and the online player count.
+3. Verify response has `"ok":true`, protocol version `3`, and the online player count.
 4. Open the client and connect to `ws://127.0.0.1:3001/ws` (when client and server are on the same machine).
 5. Confirm the connection-status message switches to online. Disconnect and verify offline exploration continues.
 6. In the terminal, check for runtime exceptions and ensure the server remains running.
@@ -639,7 +644,7 @@ adb logcat > android-session.log
 - [ ] Android Gradle `assembleDebug` succeeds and artifact exists.
 - [ ] Offline exploration still works.
 - [ ] Two distinct guest clients can connect and see movement.
-- [ ] In protocol v2, they agree on shared wolf HP/phase and rejected forged attacks.
+- [ ] In protocol v3, they agree on shared wolf HP/phase and rejected forged attacks.
 - [ ] Position persistence survives a graceful restart.
 - [ ] World chunks, road geometry, map and discovery states remain stable.
 - [ ] Real Android device boot/controls/performance verified for release candidates.
@@ -749,6 +754,7 @@ Frequency:
 
 - [Multiplayer Server](docs/MULTIPLAYER_SERVER.md)
 - [Authoritative Combat](docs/AUTHORITATIVE_COMBAT.md)
+- [Inventory and Loot](docs/INVENTORY_LOOT.md)
 - [World Streaming](docs/WORLD_STREAMING.md)
 - [Terrain and Biomes](docs/TERRAIN_BIOMES.md)
 - [World Landmarks / Content](docs/WORLD_CONTENT.md)

@@ -32,3 +32,13 @@
 #multiplayer-panel input{min-width:0;width:190px;max-width:21vw;border-radius:5px;padding:5px;color:#f5f2db;border:1px solid #719183;background:#243b35;font-size:11px}
 #multiplayer-panel button{color:white;border:1px solid #7eaa93;border-radius:5px;background:#315a48;font-size:10px;padding:6px;touch-action:manipulation}
 @media(max-width:700px){#multiplayer-panel{top:42px;left:8px;max-width:60vw}#multiplayer-panel input{width:90px}#multiplayer-panel button{font-size:9px;padding:4px}}
+
+#inventory-toggle{position:absolute;left:17px;top:95px;z-index:15;background:#1d3934ef;color:#f5f0da;border:1px solid #a0c7a8;border-radius:10px;padding:8px 12px;font-weight:700;font-size:11px}
+#inventory-panel{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(90vw,380px);max-height:80vh;overflow:auto;z-index:32;background:#152b26f7;border:2px solid #a2b494;border-radius:14px;padding:15px;color:#f6efd9;box-shadow:0 15px 60px #0009}
+#inventory-panel[hidden]{display:none}
+#inventory-panel .bag-heading{display:flex;justify-content:space-between;align-items:center}
+#inventory-panel .bag-heading button{background:#31544e;color:white;border:1px solid #819d85;border-radius:8px;padding:6px 10px}
+#bag-coins{font-weight:700;color:#ffda8b}
+.bag-item{display:flex;justify-content:space-between;padding:9px 7px;border-bottom:1px solid #71887677}
+.bag-note{font-size:11px;color:#c0d2c6;line-height:1.5}
+@media(max-width:700px){#inventory-toggle{left:8px;top:88px;padding:6px 9px}}

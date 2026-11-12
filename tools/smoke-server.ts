@@ -72,7 +72,17 @@ async function run(){
     });
   });
   await sharedSnapshot;
-  console.log("PASS multiplayer smoke: 2 guests, authoritative movement, shared wolf and rejected forged attack");
+  const inventoryPromise=new Promise<any>((resolve,reject)=>{
+    const timer=setTimeout(()=>reject(new Error("Inventory response timed out")),3000);
+    first.socket.addEventListener("message",e=>{
+      const packet=JSON.parse(String(e.data));
+      if(packet.type==="inventory"){clearTimeout(timer);resolve(packet);}
+    });
+  });
+  first.socket.send(JSON.stringify({type:"inventory"}));
+  const bag=await inventoryPromise;
+  if(bag.coins!==0||bag.items.length!==0)throw Error("New guest inventory not empty");
+  console.log("PASS multiplayer smoke: movements, shared wolf, rejected forged hit, inventory read");
 }
 try{await run();}
 finally{

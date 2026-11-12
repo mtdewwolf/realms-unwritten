@@ -1,13 +1,14 @@
 import * as THREE from "three";
 import {createAdventurer} from "../characters/rig";
 import {WORLD_HALF_SIZE} from "../world/chunkedWorld";
+import type {InventoryState,RewardEvent} from "../ui/inventory";
 
 interface PlayerState{id:string;name:string;x:number;z:number;heading:number}
 export interface ServerWolf{id:string;x:number;z:number;heading:number;health:number;maxHealth:number;phase:"idle"|"chase"|"windup"|"strike"|"dead";windupUntil:number}
 export interface ServerVitals{health:number;stamina:number;maxHealth:number;maxStamina:number;alive:boolean}
 interface Snapshot{type:"snapshot";tick:number;you:PlayerState;others:PlayerState[];ack:number;vitals:ServerVitals;wolf:ServerWolf|null}
 export interface CombatActionResult{type:"action_result";seq:number;action:"attack"|"dodge";ok:boolean;reason?:string;wolfHealth:number;health:number;stamina:number}
-type ServerMessage={type:"welcome";protocol:number;id:string;token:string;player:PlayerState}|Snapshot|CombatActionResult|{type:"error";message:string};
+type ServerMessage={type:"welcome";protocol:number;id:string;token:string;player:PlayerState}|Snapshot|CombatActionResult|InventoryState|RewardEvent|{type:"error";message:string};
 export interface MovementInput{dx:number;dz:number}
 const TOKEN_KEY="realms-unwritten-guest-token-v1";
 function storedToken():string|null{try{return localStorage.getItem(TOKEN_KEY);}catch{return null;}}
@@ -20,7 +21,7 @@ export class MultiplayerClient {
   private readonly others=new Map<string,{mesh:THREE.Group;target:PlayerState}>();
   private lastSend=0;
   private online=false;
-  constructor(private readonly scene:THREE.Scene,private readonly avatar:THREE.Group,private readonly status:(s:string)=>void,private readonly onCombat:(vitals:ServerVitals,wolf:ServerWolf|null)=>void,private readonly onActionResult:(result:CombatActionResult)=>void,private readonly onOffline:()=>void){}
+  constructor(private readonly scene:THREE.Scene,private readonly avatar:THREE.Group,private readonly status:(s:string)=>void,private readonly onCombat:(vitals:ServerVitals,wolf:ServerWolf|null)=>void,private readonly onActionResult:(result:CombatActionResult)=>void,private readonly onOffline:()=>void,private readonly onInventory:(state:InventoryState)=>void,private readonly onReward:(event:RewardEvent)=>void){}
   get connected():boolean{return this.online&&this.socket?.readyState===WebSocket.OPEN;}
   connect(url:string):void{
     this.disconnect();
@@ -35,11 +36,13 @@ export class MultiplayerClient {
       try{message=JSON.parse(String(event.data)) as ServerMessage;}catch{return;}
       if(message.type==="error"){this.status(message.message);return;}
       if(message.type==="welcome"){
-        if(message.protocol!==2){ws.close();this.status("Incompatible server protocol");return;}
+        if(message.protocol!==3){ws.close();this.status("Incompatible server protocol");return;}
         this.id=message.id;saveToken(message.token);this.online=true;
         this.avatar.position.x=message.player.x;this.avatar.position.z=message.player.z;
         this.status("Online · authoritative movement connected");return;
       }
+      if(message.type==="inventory"){this.onInventory(message);return;}
+      if(message.type==="reward"){this.onReward(message);return;}
       if(message.type==="action_result"){this.onActionResult(message);return;}
       if(message.type==="snapshot" && this.online){
         this.onCombat(message.vitals,message.wolf);
@@ -75,6 +78,11 @@ export class MultiplayerClient {
       for(const entry of this.others.values())this.scene.remove(entry.mesh);
       this.others.clear();
     };
+  }
+  requestInventory():boolean{
+    if(!this.connected)return false;
+    this.socket!.send(JSON.stringify({type:"inventory"}));
+    return true;
   }
   sendAction(action:"attack"|"dodge"):boolean{
     if(!this.connected)return false;
