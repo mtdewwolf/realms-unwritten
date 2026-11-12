@@ -56,7 +56,7 @@ export class InventoryStore {
   equip(id:string,weapon:WeaponId):boolean{
     if(weapon!=="starter-sword"&&weapon!=="fangblade"&&weapon!=="ironblade")return false;
     if(weapon!=="starter-sword"){
-      const owned=this.db.query<{quantity:number},[string]>("SELECT quantity FROM inventory_stacks WHERE character_id=? AND item_id=?").get(id,weapon);
+      const owned=this.db.query<{quantity:number},[string,string]>("SELECT quantity FROM inventory_stacks WHERE character_id=? AND item_id=?").get(id,weapon);
       if(!owned||owned.quantity<1)return false;
     }
     this.db.query("INSERT INTO equipment(character_id,weapon_id) VALUES (?,?) ON CONFLICT(character_id) DO UPDATE SET weapon_id=excluded.weapon_id").run(id,weapon);
