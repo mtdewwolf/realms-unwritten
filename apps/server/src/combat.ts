@@ -1,3 +1,4 @@
+import {randomUUID} from "node:crypto";
 /** Deterministic server-owned starter wolf encounter; no client health or coordinates accepted. */
 import type {WorldSimulation,SimPlayer} from "./simulation";
 
@@ -42,6 +43,8 @@ export class CombatSimulation {
     windupUntil:0,nextAttackAt:0,respawnAt:0,targetId:null
   };
   time=0;
+  readonly contributors=new Set<string>();
+  onWolfDefeated:((eventId:string,contributors:readonly string[])=>void)|null=null;
   constructor(readonly world:WorldSimulation){}
   join(id:string):void{
     this.players.set(id,{health:MAX_HEALTH,stamina:MAX_STAMINA,maxHealth:MAX_HEALTH,maxStamina:MAX_STAMINA,
@@ -49,6 +52,7 @@ export class CombatSimulation {
   }
   leave(id:string):void{
     this.players.delete(id);
+    this.contributors.delete(id);
     if(this.wolf.targetId===id){this.wolf.targetId=null;this.wolf.phase="idle";}
   }
   vital(id:string):VitalView|null{
@@ -88,10 +92,14 @@ export class CombatSimulation {
     if(this.wolf.phase==="dead")return result(false,"wolf defeated");
     if(range(actor,this.wolf)>ATTACK_RANGE)return result(false,"target out of range");
     this.wolf.health=Math.max(0,this.wolf.health-ATTACK_DAMAGE);
+    this.contributors.add(id);
     if(this.wolf.health===0){
       this.wolf.phase="dead";
       this.wolf.respawnAt=this.time+8;
       this.wolf.targetId=null;
+      const eligible=[...this.contributors];
+      this.contributors.clear();
+      this.onWolfDefeated?.("wolf-kill-"+randomUUID(),eligible);
     }
     return result(true);
   }
@@ -113,7 +121,7 @@ export class CombatSimulation {
     if(w.phase==="dead"){
       if(this.time>=w.respawnAt){
         w.x=5;w.z=5;w.heading=0;w.health=WOLF_MAX_HEALTH;w.phase="idle";
-        w.nextAttackAt=this.time+1;w.targetId=null;w.windupUntil=0;
+        w.nextAttackAt=this.time+1;w.targetId=null;w.windupUntil=0;this.contributors.clear();
       }
       return;
     }

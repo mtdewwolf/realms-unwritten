@@ -5,6 +5,7 @@ import {mkdirSync} from "node:fs";
 import {dirname} from "node:path";
 import {WorldSimulation,view} from "./simulation";
 import {CombatSimulation} from "./combat";
+import {InventoryStore} from "./inventory";
 import {PROTOCOL_VERSION,SIMULATION_HZ,SNAPSHOT_HZ,validateHello,type ServerMessage} from "./protocol";
 
 const dbFile=process.env.WORLD_DB_PATH||"data/realms-world.sqlite";
@@ -17,9 +18,20 @@ const insertCharacter=db.query("INSERT INTO characters (id,token_hash,name,x,z,u
 const saveCharacter=db.query("UPDATE characters SET x=?,z=?,updated_at=? WHERE id=?");
 const world=new WorldSimulation();
 const combat=new CombatSimulation(world);
+const inventory=new InventoryStore(db);
 type Session={playerId:string|null; token:string|null; lastInputAt:number;messages:number; windowStart:number};
 const socketByPlayer=new Map<string,ServerWebSocket<Session>>();
 const hash=(token:string)=>createHash("sha256").update(token).digest("hex");
+combat.onWolfDefeated=(eventId,contributors)=>{
+  for(const id of contributors){
+    const ws=socketByPlayer.get(id);
+    if(!ws)continue;
+    const reward=inventory.grantWolfKill(eventId,id);
+    if(!reward)continue;
+    send(ws,reward);
+    send(ws,inventory.read(id));
+  }
+};
 const save=(id:string)=>{
   const p=world.players.get(id);
   if(p)saveCharacter.run(p.x,p.z,Date.now(),id);
@@ -81,6 +93,11 @@ const server=Bun.serve<Session>({
         combat.join(stored.id);
         socketByPlayer.set(stored.id,ws);
         send(ws,{type:"welcome",protocol:PROTOCOL_VERSION,id:stored.id,token,player:view(player)});
+        send(ws,inventory.read(stored.id));
+        return;
+      }
+      if((packet as {type?:unknown})?.type==="inventory"){
+        send(ws,inventory.read(ws.data.playerId));
         return;
       }
       if((packet as {type?:unknown})?.type==="action"){
