@@ -54,3 +54,14 @@
 #quest-panel .quest-actions{display:flex;gap:8px}
 #quest-panel .quest-note{color:#c7d1b8;font-size:11px}
 @media(max-width:700px){#quest-toggle{left:8px;top:126px;font-size:10px;padding:6px 9px}}
+
+#character-toggle{position:absolute;left:17px;top:169px;z-index:15;background:#34415aeb;color:#eef3ff;border:1px solid #94b8d5;border-radius:10px;padding:7px 12px;font-size:11px;font-weight:700;touch-action:manipulation}
+#character-panel{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(90vw,400px);max-height:85vh;overflow:auto;z-index:36;background:#162633f8;color:#eff4fd;border:2px solid #8eaabd;border-radius:14px;padding:17px;box-shadow:0 15px 70px #000a}
+#character-panel[hidden]{display:none}
+#character-panel .character-heading{display:flex;justify-content:space-between;align-items:center}
+#character-panel .character-heading button{background:#334c62;color:white;border:1px solid #8eaabd;border-radius:8px;padding:7px 11px}
+#character-level{font-weight:700;font-size:14px}
+#character-xp{display:block;width:100%;height:15px;accent-color:#70b6cf}
+.character-stat{display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #86a4b855;padding:8px 2px}
+.character-note{font-size:11px;line-height:1.5;color:#bdcad9}
+@media(max-width:700px){#character-toggle{left:8px;top:162px;padding:6px 9px;font-size:10px}}

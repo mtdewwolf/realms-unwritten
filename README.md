@@ -52,7 +52,7 @@ Status meanings: **Implemented** = present in source and exercised by automated 
 | Persistent shared world | **Planned** | No authoritative world mutation/structure ownership |
 | Server-authoritative combat/AI | **Prototype** | One synchronized Bun wolf encounter; no broader AI/spawn/loot system |
 | Inventory, equipment, loot | **Prototype** | Persistent server-owned Wolf Pelts, Fangs and coins; no equipment |
-| Skills, XP, leveling, classes | **Planned** | No character progression |
+| Skills, XP, leveling, classes | **Prototype** | Server-owned XP, levels, derived attributes, Android HERO panel; no classes or skills |
 | Gathering, crafting, economy | **Planned** | Gather button currently reports feature is pending |
 | NPC dialogue, quests, merchants | **Prototype** | Verdant Reach guard offers one persistent Wolf Hunt quest; no dialogue trees or merchants |
 | Chat, party, guilds, dungeons | **Planned** | No social or cooperative gameplay |
@@ -214,7 +214,7 @@ Server entry point: `apps/server/src/index.ts`. Core movement: `simulation.ts`. 
 - `GET /ws` with WebSocket upgrade: multiplayer connection.
 - Default port: **3001**; configurable via `PORT`.
 - Bind address: `0.0.0.0` by default; override via `HOST`.
-- Protocol version: **4** (client/server must use matching builds).
+- Protocol version: **5** (client/server must use matching builds).
 - Clients send `hello` with an optional existing guest token and optional sanitized display name; server sends `welcome` with player ID, token, initial position.
 - Clients send numbered movement vectors, not positions; server clamps speed and world bounds.
 - Server returns `snapshot` containing own authoritative position, acknowledgment sequence and nearby players.
@@ -246,6 +246,10 @@ A successful shared wolf kill grants each online damage contributor one **Wolf P
 ### Starter NPC and Wolf Hunt Quest
 
 The Verdant Reach guard at (2,-3) offers a one-time **Wolf Hunt** quest. Accept while within 6 meters of the guard, contribute successful damage to three separate shared starter-wolf defeats, and return to claim **25 coins**. Quest state and kill receipts live in SQLite; each character receives independent progress, and a repeated turn-in cannot duplicate coins. The Android QUEST panel shows the objective and current count. Online only; no XP, dialogue trees or quest chains. See [Wolf Hunt Quest](docs/WOLF_HUNT_QUEST.md).
+
+### Persistent character XP and levels
+
+The server awards **15 XP** for each qualified wolf kill and **75 XP** upon the one-time Wolf Hunt turn-in. Total XP and idempotent reward receipts are stored in SQLite. Level 2 requires 100 total XP; after three wolf kills and the quest payout, a character has 120 XP and reaches level 2. The Android **HERO** panel displays level, XP progress, Strength, Vitality and Agility. These attributes are **currently informational only**, not combat modifiers. See [Character Progression](docs/CHARACTER_PROGRESSION.md).
 
 ### Guest persistence
 
@@ -457,6 +461,7 @@ Existing Bun test files cover:
 | `test/server-combat.test.ts` | Shared wolf health, range/cooldown/dodge validation, respawn |
 | `test/inventory.test.ts` | Atomic reward grants, duplicate prevention and eligibility |
 | `test/quests.test.ts` | Persistent quest progress, kill deduplication, one-time turn-in, guard range |
+| `test/progression.test.ts` | XP receipts, leveling, persistence, quest atomicity |
 
 Focused runs:
 
@@ -491,7 +496,7 @@ Run this in addition to `bun test`; it is not a normal `test/*.test.ts` unit tes
    curl -fsS http://127.0.0.1:3001/health
    ```
 
-3. Verify response has `"ok":true`, protocol version `4`, and the online player count.
+3. Verify response has `"ok":true`, protocol version `5`, and the online player count.
 4. Open the client and connect to `ws://127.0.0.1:3001/ws` (when client and server are on the same machine).
 5. Confirm the connection-status message switches to online. Disconnect and verify offline exploration continues.
 6. In the terminal, check for runtime exceptions and ensure the server remains running.
@@ -649,7 +654,7 @@ adb logcat > android-session.log
 - [ ] Android Gradle `assembleDebug` succeeds and artifact exists.
 - [ ] Offline exploration still works.
 - [ ] Two distinct guest clients can connect and see movement.
-- [ ] In protocol v4, they agree on shared wolf HP/phase and rejected forged attacks.
+- [ ] In protocol v5, they agree on shared wolf HP/phase and rejected forged attacks.
 - [ ] Position persistence survives a graceful restart.
 - [ ] World chunks, road geometry, map and discovery states remain stable.
 - [ ] Real Android device boot/controls/performance verified for release candidates.
@@ -730,7 +735,7 @@ Frequency:
 - Expand persistent Wolf Hunt to multiple quests, branching objectives and a proper quest log.
 - Inventory, basic gear and item rewards.
 - Server-owned gathering and resource depletion.
-- XP, levels, stats and character persistence.
+- Extend persistent XP and level attributes into skills, classes and meaningful combat effects.
 
 ### Priority 3 — Expand the authoritative combat vertical slice
 
@@ -761,6 +766,7 @@ Frequency:
 - [Authoritative Combat](docs/AUTHORITATIVE_COMBAT.md)
 - [Inventory and Loot](docs/INVENTORY_LOOT.md)
 - [Wolf Hunt Quest](docs/WOLF_HUNT_QUEST.md)
+- [Character Progression](docs/CHARACTER_PROGRESSION.md)
 - [World Streaming](docs/WORLD_STREAMING.md)
 - [Terrain and Biomes](docs/TERRAIN_BIOMES.md)
 - [World Landmarks / Content](docs/WORLD_CONTENT.md)

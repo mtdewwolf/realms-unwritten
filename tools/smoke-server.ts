@@ -102,7 +102,12 @@ async function run(){
   const early=waitFor(second.socket,"quest_result","turnin");
   second.socket.send(JSON.stringify({type:"quest",action:"turnin"}));
   if((await early).ok)throw Error("Early turn-in incorrectly succeeded");
-  console.log("PASS multiplayer smoke: movement, shared wolf, inventory, quest acceptance and rejected early reward");
+  const progressionReply=waitFor(second.socket,"progression");
+  second.socket.send(JSON.stringify({type:"progression"}));
+  const progression=await progressionReply;
+  if(progression.level!==1||progression.xp!==0||progression.attributes.strength!==5)
+    throw Error("Unexpected new-character progression: "+JSON.stringify(progression));
+  console.log("PASS multiplayer smoke: movement, shared wolf, inventory, quest and initial progression");
 }
 try{await run();}
 finally{

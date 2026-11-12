@@ -8,6 +8,7 @@ import { WorldMap } from "./ui/worldMap";
 import { MultiplayerClient, type ServerWolf, type ServerVitals, type CombatActionResult } from "./multiplayer/client";
 import { InventoryPanel } from "./ui/inventory";
 import { QuestPanel } from "./ui/quests";
+import { CharacterPanel } from "./ui/character";
 import { settlementsNear, discoverySettlements } from "./world/settlements";
 import { createAdventurer, createWolf } from "./characters/rig";
 import { mountAnimatedAsset, type AnimatedAsset, type AnimationState } from "./characters/animatedAsset";
@@ -120,6 +121,7 @@ const exploration = document.querySelector<HTMLElement>("#exploration")!;
 const atlas = new WorldMap(app);
 const inventoryPanel=new InventoryPanel(app);
 const questPanel=new QuestPanel(app,scene,action=>multiplayer.sendQuest(action));
+const characterPanel=new CharacterPanel(app,()=>multiplayer.requestProgression());
 inventoryPanel.button.addEventListener("click",()=>multiplayer.requestInventory());
 let onlineWolf:ServerWolf|null=null;
 let lastServerStrikePhase="";
@@ -153,11 +155,13 @@ const multiplayer = new MultiplayerClient(scene, avatar,
     warningRing.visible=false;
     inventoryPanel.offline();
     questPanel.offline();
+    characterPanel.offline();
   },
   state=>inventoryPanel.update(state),
   reward=>{battleInfo.textContent="Loot earned: "+reward.items.map(item=>item.name).join(", ")+" +"+reward.coins+" coins";},
   quest=>questPanel.update(quest),
-  result=>{questPanel.result(result);if(result.ok&&result.action==="turnin")status.textContent="Wolf Hunt complete · +25 coins";}
+  result=>{questPanel.result(result);if(result.ok&&result.action==="turnin")status.textContent="Wolf Hunt complete · +25 coins";},
+  state=>{const newLevel=characterPanel.update(state);if(newLevel!==null)status.textContent="Level up! You reached level "+newLevel;}
 );
 const multiplayerPanel=document.createElement("div");
 multiplayerPanel.id="multiplayer-panel";
