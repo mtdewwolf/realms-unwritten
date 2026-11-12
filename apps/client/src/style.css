@@ -27,3 +27,8 @@
 #world-map-guidance{position:absolute;left:50%;top:max(11px,env(safe-area-inset-top));transform:translateX(-50%);font-size:12px;padding:7px 12px;background:#142b25e6;border-radius:9px;pointer-events:none;z-index:9}
 #world-map-guidance:empty{display:none}
 @media(max-width:700px){header{left:110px;top:max(10px,env(safe-area-inset-top))}#world-map-toggle{font-size:10px;padding:7px 10px}#world-map-panel{padding:9px}#world-map-canvas{width:min(65vh,100%,320px)}}
+
+#multiplayer-panel{position:absolute;left:max(15px,env(safe-area-inset-left));top:48px;display:flex;gap:4px;align-items:center;z-index:12;padding:4px;border-radius:8px;background:#132923dc;max-width:45vw}
+#multiplayer-panel input{min-width:0;width:190px;max-width:21vw;border-radius:5px;padding:5px;color:#f5f2db;border:1px solid #719183;background:#243b35;font-size:11px}
+#multiplayer-panel button{color:white;border:1px solid #7eaa93;border-radius:5px;background:#315a48;font-size:10px;padding:6px;touch-action:manipulation}
+@media(max-width:700px){#multiplayer-panel{top:42px;left:8px;max-width:60vw}#multiplayer-panel input{width:90px}#multiplayer-panel button{font-size:9px;padding:4px}}

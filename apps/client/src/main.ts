@@ -5,6 +5,7 @@ import { ChunkedWorld, WORLD_HALF_SIZE, chunkCoordinate, groundHeightAt } from "
 import { biomeAt } from "./world/terrain";
 import { landmarksNear, discoverableLandmarks } from "./world/landmarks";
 import { WorldMap } from "./ui/worldMap";
+import { MultiplayerClient } from "./multiplayer/client";
 import { settlementsNear, discoverySettlements } from "./world/settlements";
 import { createAdventurer, createWolf } from "./characters/rig";
 import { mountAnimatedAsset, type AnimatedAsset, type AnimationState } from "./characters/animatedAsset";
@@ -115,6 +116,17 @@ const status = document.querySelector<HTMLElement>("#status")!;
 const coordinates = document.querySelector<HTMLElement>("#world-coordinates")!;
 const exploration = document.querySelector<HTMLElement>("#exploration")!;
 const atlas = new WorldMap(app);
+const multiplayer = new MultiplayerClient(scene, avatar, text=>{status.textContent=text;});
+const multiplayerPanel=document.createElement("div");
+multiplayerPanel.id="multiplayer-panel";
+multiplayerPanel.innerHTML='<input id="server-url" aria-label="Multiplayer server URL" placeholder="ws://192.168.1.50:3001/ws" autocomplete="off"/><button id="server-connect" type="button">CONNECT</button><button id="server-disconnect" type="button">OFFLINE</button>';
+app.appendChild(multiplayerPanel);
+const serverUrlInput=multiplayerPanel.querySelector<HTMLInputElement>("#server-url")!;
+multiplayerPanel.querySelector("#server-connect")!.addEventListener("click",()=>multiplayer.connect(serverUrlInput.value.trim()));
+multiplayerPanel.querySelector("#server-disconnect")!.addEventListener("click",()=>{multiplayer.disconnect();status.textContent="Offline · local exploration";});
+const isLocalHost=["localhost","127.0.0.1"].includes(location.hostname);
+if(isLocalHost)serverUrlInput.value="ws://"+location.hostname+":3001/ws";
+
 const discoveryKey = "realms-unwritten-discoveries-v1";
 let discovered = new Set<string>();
 try { const saved=JSON.parse(localStorage.getItem(discoveryKey) || "[]"); if(Array.isArray(saved))discovered=new Set(saved.filter((id): id is string => typeof id==="string")); } catch { /* Private mode or bad data: current session only */ }
@@ -247,11 +259,19 @@ function frame(now: number) {
     const forward = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw));
     const right = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw));
     const heading = right.multiplyScalar(x).addScaledVector(forward, -z).normalize();
-    avatar.position.addScaledVector(heading, dt * 5.5);
+    if(!multiplayer.connected)avatar.position.addScaledVector(heading, dt * 5.5);
     avatar.position.x = THREE.MathUtils.clamp(avatar.position.x, -WORLD_HALF_SIZE+2, WORLD_HALF_SIZE-2);
     avatar.position.z = THREE.MathUtils.clamp(avatar.position.z, -WORLD_HALF_SIZE+2, WORLD_HALF_SIZE-2);
     avatar.rotation.y = Math.atan2(heading.x, heading.z);
   }
+  if(multiplayer.connected){
+    const rawForward=new THREE.Vector3(-Math.sin(yaw),0,-Math.cos(yaw));
+    const rawRight=new THREE.Vector3(Math.cos(yaw),0,-Math.sin(yaw));
+    const vec=rawRight.multiplyScalar(x).addScaledVector(rawForward,-z);
+    const magnitude=Math.hypot(vec.x,vec.z);
+    multiplayer.sendMovement({dx:magnitude>.05?vec.x/Math.max(1,magnitude):0,dz:magnitude>.05?vec.z/Math.max(1,magnitude):0},now);
+  }
+  multiplayer.update(dt,groundHeightAt);
   adventurer.update(elapsed,length>0.05 && playerHealth>0,now/1000<attackingUntil);
   const playerState: AnimationState = now/1000<attackingUntil ? "attack" :
     now/1000<dodgeUntil ? "dodge" : length>0.05 && playerHealth>0 ? "walk" : "idle";
