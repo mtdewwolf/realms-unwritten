@@ -49,7 +49,30 @@ async function run(){
   });
   first.socket.send(JSON.stringify({type:"input",seq:1,dx:1,dz:0,x:4000}));
   await target;
-  console.log("PASS multiplayer smoke: 2 guests, authoritative position and nearby snapshots");
+  const attackResult=new Promise<any>((resolve,reject)=>{
+    const timeout=setTimeout(()=>reject(new Error("Server combat action timed out")),3500);
+    first.socket.addEventListener("message",e=>{
+      const packet=JSON.parse(String(e.data));
+      if(packet.type==="action_result"&&packet.seq===1){
+        clearTimeout(timeout);resolve(packet);
+      }
+    });
+  });
+  first.socket.send(JSON.stringify({type:"action",seq:1,action:"attack",target:"starter-wolf-v1",damage:99999}));
+  const attack=await attackResult;
+  if(attack.ok||attack.reason!=="target out of range"||attack.wolfHealth!==60)
+    throw new Error("Server accepted an out-of-range or client-forged damage claim: "+JSON.stringify(attack));
+  const sharedSnapshot=new Promise<void>((resolve,reject)=>{
+    const timeout=setTimeout(()=>reject(new Error("Shared wolf snapshot timed out")),3500);
+    second.socket.addEventListener("message",e=>{
+      const packet=JSON.parse(String(e.data));
+      if(packet.type==="snapshot"&&packet.wolf?.health===60&&packet.vitals?.health===100){
+        clearTimeout(timeout);resolve();
+      }
+    });
+  });
+  await sharedSnapshot;
+  console.log("PASS multiplayer smoke: 2 guests, authoritative movement, shared wolf and rejected forged attack");
 }
 try{await run();}
 finally{

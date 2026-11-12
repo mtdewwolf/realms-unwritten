@@ -3,8 +3,11 @@ import {createAdventurer} from "../characters/rig";
 import {WORLD_HALF_SIZE} from "../world/chunkedWorld";
 
 interface PlayerState{id:string;name:string;x:number;z:number;heading:number}
-interface Snapshot{type:"snapshot";tick:number;you:PlayerState;others:PlayerState[];ack:number}
-type ServerMessage={type:"welcome";protocol:number;id:string;token:string;player:PlayerState}|Snapshot|{type:"error";message:string};
+export interface ServerWolf{id:string;x:number;z:number;heading:number;health:number;maxHealth:number;phase:"idle"|"chase"|"windup"|"strike"|"dead";windupUntil:number}
+export interface ServerVitals{health:number;stamina:number;maxHealth:number;maxStamina:number;alive:boolean}
+interface Snapshot{type:"snapshot";tick:number;you:PlayerState;others:PlayerState[];ack:number;vitals:ServerVitals;wolf:ServerWolf|null}
+export interface CombatActionResult{type:"action_result";seq:number;action:"attack"|"dodge";ok:boolean;reason?:string;wolfHealth:number;health:number;stamina:number}
+type ServerMessage={type:"welcome";protocol:number;id:string;token:string;player:PlayerState}|Snapshot|CombatActionResult|{type:"error";message:string};
 export interface MovementInput{dx:number;dz:number}
 const TOKEN_KEY="realms-unwritten-guest-token-v1";
 function storedToken():string|null{try{return localStorage.getItem(TOKEN_KEY);}catch{return null;}}
@@ -13,13 +16,15 @@ export class MultiplayerClient {
   private socket:WebSocket|null=null;
   private id:string|null=null;
   private sequence=0;
+  private actionSequence=0;
   private readonly others=new Map<string,{mesh:THREE.Group;target:PlayerState}>();
   private lastSend=0;
   private online=false;
-  constructor(private readonly scene:THREE.Scene,private readonly avatar:THREE.Group,private readonly status:(s:string)=>void){}
+  constructor(private readonly scene:THREE.Scene,private readonly avatar:THREE.Group,private readonly status:(s:string)=>void,private readonly onCombat:(vitals:ServerVitals,wolf:ServerWolf|null)=>void,private readonly onActionResult:(result:CombatActionResult)=>void,private readonly onOffline:()=>void){}
   get connected():boolean{return this.online&&this.socket?.readyState===WebSocket.OPEN;}
   connect(url:string):void{
     this.disconnect();
+    this.sequence=0;this.actionSequence=0;this.lastSend=0;
     if(!/^wss?:\/\/\S+$/i.test(url)){this.status("Enter a valid ws:// or wss:// server URL");return;}
     this.status("Connecting to multiplayer server…");
     const ws=new WebSocket(url);
@@ -30,12 +35,14 @@ export class MultiplayerClient {
       try{message=JSON.parse(String(event.data)) as ServerMessage;}catch{return;}
       if(message.type==="error"){this.status(message.message);return;}
       if(message.type==="welcome"){
-        if(message.protocol!==1){ws.close();this.status("Incompatible server protocol");return;}
+        if(message.protocol!==2){ws.close();this.status("Incompatible server protocol");return;}
         this.id=message.id;saveToken(message.token);this.online=true;
         this.avatar.position.x=message.player.x;this.avatar.position.z=message.player.z;
         this.status("Online · authoritative movement connected");return;
       }
+      if(message.type==="action_result"){this.onActionResult(message);return;}
       if(message.type==="snapshot" && this.online){
+        this.onCombat(message.vitals,message.wolf);
         const {you,others}=message;
         // Smooth small reconciliation errors; snap only after larger divergence.
         const delta=Math.hypot(this.avatar.position.x-you.x,this.avatar.position.z-you.z);
@@ -64,9 +71,15 @@ export class MultiplayerClient {
     ws.onclose=()=>{
       if(this.socket!==ws)return;
       this.online=false;this.id=null;this.status("Offline · local exploration mode");
+      this.onOffline();
       for(const entry of this.others.values())this.scene.remove(entry.mesh);
       this.others.clear();
     };
+  }
+  sendAction(action:"attack"|"dodge"):boolean{
+    if(!this.connected)return false;
+    this.socket!.send(JSON.stringify({type:"action",seq:++this.actionSequence,action,target:action==="attack"?"starter-wolf-v1":undefined}));
+    return true;
   }
   sendMovement(input:MovementInput,now:number):void{
     if(!this.connected||now-this.lastSend<50)return;
@@ -86,6 +99,7 @@ export class MultiplayerClient {
   }
   disconnect():void{
     const ws=this.socket;this.socket=null;this.online=false;this.id=null;
+    this.onOffline();
     if(ws){ws.onclose=null;ws.close();}
     for(const entry of this.others.values())this.scene.remove(entry.mesh);
     this.others.clear();

@@ -4,7 +4,7 @@
 
 Built with **Bun + TypeScript + Three.js + Vite + Capacitor**, using Blender to generate original rigged GLB character prototypes. Windows/desktop web play is supported for development and testing; Android is the priority platform.
 
-> **Reality check:** This repository contains an original evolving prototype, **not a finished MMORPG**. World generation, local wolf combat, exploration, map, and a single-process authoritative **movement** server are implemented. Quests, inventory, crafting, economy, accounts, authoritative combat, NPC simulation, and MMO-scale operation are **not implemented**. Older "0.6" multiplayer gameplay source referenced in earlier planning has **not** been imported into this repository. See [Current status](#current-feature-matrix) and [Outstanding work](#outstanding-work).
+> **Reality check:** This repository contains an original evolving prototype, **not a finished MMORPG**. World generation, local wolf combat, exploration, map, and a single-process authoritative **movement** server are implemented. Quests, inventory, crafting, economy, accounts, production-ready combat, NPC ecosystems, and MMO-scale operation are **not implemented**. **A single shared server-authoritative wolf combat vertical slice is now implemented**; it has no rewards and does not represent a completed combat system. Older "0.6" multiplayer gameplay source referenced in earlier planning has **not** been imported into this repository. See [Current status](#current-feature-matrix) and [Outstanding work](#outstanding-work).
 
 ## Contents
 
@@ -38,7 +38,7 @@ Status meanings: **Implemented** = present in source and exercised by automated 
 | Heightfield and biomes | **Prototype** | Deterministic terrain elevation; meadow, woodland, highlands |
 | Terrain-aware player/prop elevation | **Prototype** | Triangle-interpolated ground height; no physics-based collision |
 | Original characters | **Prototype** | Blender-generated adventurer and wolf GLBs, rigged animation clips |
-| Combat | **Prototype (local only)** | Wolf encounter, 20-damage sword hits, stamina, dodge, health, wind-up |
+| Combat | **Prototype (online authoritative starter wolf + offline local demo)** | Bun owns one shared wolf, attacks, cooldowns, health/stamina, telegraphs, death and respawn; no XP/loot |
 | Landmarks and resource imagery | **Prototype** | Ruins, ore outcrops, dens; no functional mining or harvesting |
 | Roads | **Prototype** | Rectangular 512-meter-spaced road corridors, generated with chunks |
 | Settlements | **Prototype** | Starter village plus deterministic hamlets/outposts and beacons |
@@ -50,7 +50,7 @@ Status meanings: **Implemented** = present in source and exercised by automated 
 | Character position persistence | **Prototype** | Bun SQLite guest tokens and position records |
 | Real accounts / characters | **Planned** | No login, recovery, selection, multiple slots |
 | Persistent shared world | **Planned** | No authoritative world mutation/structure ownership |
-| Server-authoritative combat/AI | **Planned** | Existing wolf combat is entirely local |
+| Server-authoritative combat/AI | **Prototype** | One synchronized Bun wolf encounter; no broader AI/spawn/loot system |
 | Inventory, equipment, loot | **Planned** | No inventory database or gameplay |
 | Skills, XP, leveling, classes | **Planned** | No character progression |
 | Gathering, crafting, economy | **Planned** | Gather button currently reports feature is pending |
@@ -68,10 +68,10 @@ The long-term goal is a large shared fantasy world where players explore distinc
 2. Move through generated hills, forests and open terrain.
 3. Discover ruins, ore outcrops, dens and named settlements.
 4. Open the world atlas to review explored cells; set a directional waypoint.
-5. Fight a **local prototype wolf** with sword and dodge mechanics.
+5. Fight the **server-owned shared starter wolf when online**, or a local wolf demonstration when offline.
 6. Optionally connect to a Bun game server to see nearby guest players and synchronize movement.
 
-The server does **not** currently share the wolf encounter, drops, discoveries or any other gameplay world state. Do not assume that actions taken in an offline session are merged into an online account.
+The server now shares **one starter wolf encounter**, including its movement, health, bite windup and respawn. It does **not** share loot, discoveries, economy, quests or other world state. Do not assume that actions taken in an offline session are merged into an online account.
 
 ### Platforms
 
@@ -129,7 +129,7 @@ Joystick/camera pointers are reset when the window loses focus or the document i
 - Wolf bite telegraph ~**0.85 sec**, bite damage **12**, cooldown approximately **1.5 sec**.
 - Player has **100 HP** in the encounter; UI shows player/wolf health, stamina and combat messages.
 - A defeated wolf is removed/hidden in the local demo; respawn and loot are not implemented.
-- **All attacks, enemy movement and health changes are currently client-owned.** They are not propagated to the Bun server and must not be used for competitive or reward-bearing multiplayer.
+- **When connected, wolf attacks, enemy health/movement, cooldowns and player health/stamina are server-owned.** Offline mode retains the local demo. No rewards, server-side physics collision or production-grade combat security exist yet.
 
 ### Character art
 
@@ -206,7 +206,7 @@ Android Capacitor client / desktop browser
               └── SQLite guest characters / saved positions
 ```
 
-Server entry point: `apps/server/src/index.ts`. Core movement: `simulation.ts`. Message validation: `protocol.ts`. Client integration: `apps/client/src/multiplayer/client.ts`.
+Server entry point: `apps/server/src/index.ts`. Core movement: `simulation.ts`. Message validation: `protocol.ts`, with authoritative wolf combat in `combat.ts`. Client integration: `apps/client/src/multiplayer/client.ts`.
 
 ### HTTP and WebSocket
 
@@ -214,7 +214,7 @@ Server entry point: `apps/server/src/index.ts`. Core movement: `simulation.ts`. 
 - `GET /ws` with WebSocket upgrade: multiplayer connection.
 - Default port: **3001**; configurable via `PORT`.
 - Bind address: `0.0.0.0` by default; override via `HOST`.
-- Protocol version: **1**.
+- Protocol version: **2** (client/server must use matching builds).
 - Clients send `hello` with an optional existing guest token and optional sanitized display name; server sends `welcome` with player ID, token, initial position.
 - Clients send numbered movement vectors, not positions; server clamps speed and world bounds.
 - Server returns `snapshot` containing own authoritative position, acknowledgment sequence and nearby players.
@@ -235,6 +235,10 @@ Example messages (illustrative):
 {"type":"snapshot","tick":42,"you":{"id":"...","name":"Adventurer","x":0,"z":0,"heading":0},"others":[],"ack":1}
 ```
 
+### Online starter wolf encounter
+
+When connected to a protocol v2 server, **Bun owns the wolf and player combat vitals**. Clients send `action` packets with an increasing sequence and target ID; the server checks range, stamina, cooldown and health before updating a single shared wolf. Relevant nearby snapshots carry its position, state and remaining HP. The wolf respawns eight seconds after defeat; an incapacitated player respawns after five seconds. These are prototype rules, without loot or XP. See [Authoritative Combat](docs/AUTHORITATIVE_COMBAT.md).
+
 ### Guest persistence
 
 - SQLite via Bun's `bun:sqlite`.
@@ -248,9 +252,9 @@ Example messages (illustrative):
 
 ### Boundaries of server authority
 
-**Authoritative:** guest identities within this server, x/z movement, nearby visibility and saved positions.
+**Authoritative:** guest identities within this server, x/z movement, nearby visibility and saved positions; additionally the online starter wolf encounter's health, attacks, movement, player vitals and respawn timers (combat state resets on server restart).
 
-**Not authoritative:** combat, wolf state, health, stamina, dodge effects, terrain collision, gathering, map fog, discoveries, settlements, NPCs, inventory, currency, world edits and building ownership.
+**Not authoritative:** terrain collision, physics dash movement, gathering, map fog, discoveries, settlements, NPC economies, inventory, currency, world edits and building ownership. **Authoritative prototype only:** the shared starter wolf, attack/dodge validation, damage, stamina, death and respawn.
 
 **Not production-safe:** public plain-WS exposure, localStorage bearer tokens, missing origin policy, account security, load testing, persistent shared world state and horizontal scaling. Use a private LAN for early testing; public deployment requires `wss://`, an authentication strategy and protective controls.
 
@@ -442,11 +446,12 @@ Existing Bun test files cover:
 | `test/settlements.test.ts` | Settlement locations, ownership and road-grid spacing |
 | `test/world-map.test.ts` | Map projection, fog-cell addressing and compass guidance |
 | `test/server-simulation.test.ts` | Authoritative movement, sequence rejection, bounds and proximity |
+| `test/server-combat.test.ts` | Shared wolf health, range/cooldown/dodge validation, respawn |
 
 Focused runs:
 
 ```bash
-bun test test/server-simulation.test.ts
+bun test test/server-simulation.test.ts test/server-combat.test.ts
 bun test test/chunked-world.test.ts test/terrain.test.ts
 bun test test/world-landmarks.test.ts test/settlements.test.ts test/world-map.test.ts
 bun test test/combat-demo.test.ts test/touch-camera.test.ts
@@ -476,7 +481,7 @@ Run this in addition to `bun test`; it is not a normal `test/*.test.ts` unit tes
    curl -fsS http://127.0.0.1:3001/health
    ```
 
-3. Verify response has `"ok":true`, protocol version `1`, and the online player count.
+3. Verify response has `"ok":true`, protocol version `2`, and the online player count.
 4. Open the client and connect to `ws://127.0.0.1:3001/ws` (when client and server are on the same machine).
 5. Confirm the connection-status message switches to online. Disconnect and verify offline exploration continues.
 6. In the terminal, check for runtime exceptions and ensure the server remains running.
@@ -521,7 +526,7 @@ On an Android device or touchscreen browser:
 8. Open the map while using touch controls and verify it does not unintentionally capture world-camera drags.
 9. Test input with physical keyboard attached as well as touchscreen where available.
 
-### F. Local combat gameplay
+### F. Wolf combat gameplay (offline and authoritative online)
 
 1. Start offline near the wolf.
 2. Confirm wolf health **60**, player health **100**, stamina **100**.
@@ -532,7 +537,7 @@ On an Android device or touchscreen browser:
 7. Dodge during wind-up: stamina should drop by **26** and the bite should miss if within the dodge window.
 8. Stay within wolf bite range without dodging: health should drop by **12** on a hit.
 9. Defeat the wolf (three 20-damage successful hits); confirm the wolf cannot be damaged further.
-10. Verify combat outcomes are **not claimed to persist or synchronize online**.
+10. Offline outcomes are local. Online, both clients must see the same server wolf HP/phase and their own authoritative vitals; combat state is not currently persisted across a server restart.
 11. Check behavior with zero player health; actions/movement should be disabled appropriately.
 
 ### G. World generation and streaming
@@ -634,6 +639,7 @@ adb logcat > android-session.log
 - [ ] Android Gradle `assembleDebug` succeeds and artifact exists.
 - [ ] Offline exploration still works.
 - [ ] Two distinct guest clients can connect and see movement.
+- [ ] In protocol v2, they agree on shared wolf HP/phase and rejected forged attacks.
 - [ ] Position persistence survives a graceful restart.
 - [ ] World chunks, road geometry, map and discovery states remain stable.
 - [ ] Real Android device boot/controls/performance verified for release candidates.
@@ -659,7 +665,7 @@ Frequency:
 ### Current technical limitations
 
 - Single-process server and SQLite database; no horizontal scaling, rediscovery across shards, interest spatial index or production observability.
-- Local terrain and client combat are not validated by the server.
+- Local terrain/world objects are not validated by the server. Online starter wolf damage is authoritative, but terrain collision, loot, enemy-spawn scaling and other encounters are not.
 - Touch UI may overlap on smaller displays; portrait and accessibility layouts require QA.
 - Realtime movement uses server snapshots with simple correction rather than full client prediction/replay.
 - The client does not automatically reconnect when the server returns after an outage.
@@ -683,7 +689,7 @@ Frequency:
 | Client moves offline but no second player appears | Verify both clients connected; use separate guest profiles and remain within 160 m |
 | Map doesn't reveal old locations on another device | Exploration is localStorage-only, not account-synced |
 | Gather button doesn't produce items | Gathering feature is not implemented |
-| Wolf combat differs between clients | Combat is not server-authoritative yet |
+| Wolf combat differs between clients | Confirm both use protocol v2 and are online; shared wolf combat is authoritative, offline wolf fights remain local |
 | Gradle fails on local build | Verify JDK 21, SDK location, Android build tools and generated Capacitor project |
 | Performance drops after travel | Profile streamed geometry, chunk churn, draw calls, WebView memory and thermal throttling |
 
@@ -716,12 +722,12 @@ Frequency:
 - Server-owned gathering and resource depletion.
 - XP, levels, stats and character persistence.
 
-### Priority 3 — Turn combat into real multiplayer combat
+### Priority 3 — Expand the authoritative combat vertical slice
 
-- Server-authoritative wolves/enemy AI, spawn ownership and threat.
-- Validated attack actions, cooldowns, skill effects, health and respawn.
+- Expand the one authoritative starter wolf into server-owned wildlife territories, multiple enemy types, threat rules and proper spawn ownership.
+- Extend basic validated attack/dodge, health and respawn to real skills, spatial collision and equipment-driven damage.
 - Combat feedback, targeting and loot attribution.
-- Synchronization of all combat state and death/recovery.
+- Persist relevant player health/progression, synchronize combat outcomes and implement loot/death recovery.
 
 ### Priority 4 — Meaningful world and economy
 
@@ -742,6 +748,7 @@ Frequency:
 ## Supporting design documents
 
 - [Multiplayer Server](docs/MULTIPLAYER_SERVER.md)
+- [Authoritative Combat](docs/AUTHORITATIVE_COMBAT.md)
 - [World Streaming](docs/WORLD_STREAMING.md)
 - [Terrain and Biomes](docs/TERRAIN_BIOMES.md)
 - [World Landmarks / Content](docs/WORLD_CONTENT.md)

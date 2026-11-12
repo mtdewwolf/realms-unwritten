@@ -38,7 +38,7 @@ export class WorldSimulation {
     for(const p of this.players.values())stepMovement(p,safe);
     this.tickNumber++;
   }
-  snapshot(id:string):SnapshotMessage|null{
+  snapshot(id:string):Omit<SnapshotMessage,"vitals"|"wolf">|null{
     const p=this.players.get(id);if(!p)return null;
     const nearby:PlayerState[]=[];
     for(const other of this.players.values()){

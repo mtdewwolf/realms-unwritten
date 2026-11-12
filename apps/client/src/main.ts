@@ -5,7 +5,7 @@ import { ChunkedWorld, WORLD_HALF_SIZE, chunkCoordinate, groundHeightAt } from "
 import { biomeAt } from "./world/terrain";
 import { landmarksNear, discoverableLandmarks } from "./world/landmarks";
 import { WorldMap } from "./ui/worldMap";
-import { MultiplayerClient } from "./multiplayer/client";
+import { MultiplayerClient, type ServerWolf, type ServerVitals, type CombatActionResult } from "./multiplayer/client";
 import { settlementsNear, discoverySettlements } from "./world/settlements";
 import { createAdventurer, createWolf } from "./characters/rig";
 import { mountAnimatedAsset, type AnimatedAsset, type AnimationState } from "./characters/animatedAsset";
@@ -116,7 +116,38 @@ const status = document.querySelector<HTMLElement>("#status")!;
 const coordinates = document.querySelector<HTMLElement>("#world-coordinates")!;
 const exploration = document.querySelector<HTMLElement>("#exploration")!;
 const atlas = new WorldMap(app);
-const multiplayer = new MultiplayerClient(scene, avatar, text=>{status.textContent=text;});
+let onlineWolf:ServerWolf|null=null;
+let lastServerStrikePhase="";
+const multiplayer = new MultiplayerClient(scene, avatar,
+  text=>{status.textContent=text;},
+  (vitals:ServerVitals,wolfState:ServerWolf|null)=>{
+    playerHealth=vitals.health;playerStamina=vitals.stamina;
+    hpDisplay.value=playerHealth;staminaDisplay.value=playerStamina;
+    onlineWolf=wolfState;
+    if(wolfState){
+      wolf.position.x=wolfState.x;wolf.position.z=wolfState.z;
+      wolfHealth=wolfState.health;wolfDisplay.value=wolfHealth;
+      wolf.visible=true;
+      warningRing.visible=wolfState.phase==="windup";
+      warningRing.position.set(wolfState.x,groundHeightAt(wolfState.x,wolfState.z)+.06,wolfState.z);
+      if(lastServerStrikePhase!==wolfState.phase&&wolfState.phase==="strike")wolfAttackAnimationUntil=performance.now()/1000+.55;
+      lastServerStrikePhase=wolfState.phase;
+    }else{wolf.visible=false;warningRing.visible=false;}
+  },
+  (result:CombatActionResult)=>{
+    if(!result.ok)battleInfo.textContent=result.reason||"Action rejected by server";
+    else if(result.action==="attack")battleInfo.textContent="Wolf hit · shared HP "+result.wolfHealth;
+    else battleInfo.textContent="Dodge active";
+    if(result.ok&&result.action==="attack")attackingUntil=performance.now()/1000+.27;
+    if(result.ok&&result.action==="dodge")dodgeUntil=performance.now()/1000+.6;
+  },
+  ()=>{
+    onlineWolf=null;lastServerStrikePhase="";
+    wolf.position.set(5,0,5);
+    wolf.visible=wolfHealth>0;
+    warningRing.visible=false;
+  }
+);
 const multiplayerPanel=document.createElement("div");
 multiplayerPanel.id="multiplayer-panel";
 multiplayerPanel.innerHTML='<input id="server-url" aria-label="Multiplayer server URL" placeholder="ws://192.168.1.50:3001/ws" autocomplete="off"/><button id="server-connect" type="button">CONNECT</button><button id="server-disconnect" type="button">OFFLINE</button>';
@@ -206,6 +237,7 @@ canvas.addEventListener("wheel", e => {
   distance = THREE.MathUtils.clamp(distance + e.deltaY * 0.01, 11, 30);
 }, { passive: true });
 function attack() {
+  if(multiplayer.connected){multiplayer.sendAction("attack");return;}
   const now=performance.now()/1000;
   if(now-lastAttackTime < 0.65 || wolfHealth <= 0 || playerHealth <= 0) return;
   const next=useStamina(playerStamina,ATTACK_STAMINA);
@@ -223,6 +255,7 @@ function attack() {
   } else battleInfo.textContent="Too far from the wolf";
 }
 function dodge() {
+  if(multiplayer.connected){multiplayer.sendAction("dodge");return;}
   const now=performance.now()/1000;
   if(now<dodgeUntil || playerHealth<=0)return;
   const next=useStamina(playerStamina,DODGE_STAMINA);
@@ -250,11 +283,12 @@ function frame(now: number) {
   const dt = Math.min((now - previous) / 1000, 0.05);
   previous = now;
   elapsed += dt;
-  playerStamina = regenerateStamina(playerStamina,dt);
+  if(!multiplayer.connected)playerStamina = regenerateStamina(playerStamina,dt);
   staminaDisplay.value=playerStamina;
   const x = axisX + Number(keys.has("d")) - Number(keys.has("a"));
   const z = axisZ + Number(keys.has("s")) - Number(keys.has("w"));
   const length = Math.hypot(x, z);
+  const aliveForInput=multiplayer.connected?playerHealth>0:playerHealth>0;
   if (length > 0.05 && playerHealth > 0) {
     const forward = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw));
     const right = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw));
@@ -269,7 +303,7 @@ function frame(now: number) {
     const rawRight=new THREE.Vector3(Math.cos(yaw),0,-Math.sin(yaw));
     const vec=rawRight.multiplyScalar(x).addScaledVector(rawForward,-z);
     const magnitude=Math.hypot(vec.x,vec.z);
-    multiplayer.sendMovement({dx:magnitude>.05?vec.x/Math.max(1,magnitude):0,dz:magnitude>.05?vec.z/Math.max(1,magnitude):0},now);
+    multiplayer.sendMovement({dx:magnitude>.05&&aliveForInput?vec.x/Math.max(1,magnitude):0,dz:magnitude>.05&&aliveForInput?vec.z/Math.max(1,magnitude):0},now);
   }
   multiplayer.update(dt,groundHeightAt);
   adventurer.update(elapsed,length>0.05 && playerHealth>0,now/1000<attackingUntil);
@@ -280,10 +314,15 @@ function frame(now: number) {
   const wolfDistance = Math.hypot(avatar.position.x-wolf.position.x,avatar.position.z-wolf.position.z);
   const wolfState: AnimationState = wolfHealth<=0 ? "death" :
     now/1000<wolfAttackAnimationUntil ? "attack" :
-    wolfStrikeAt>0 ? "idle" : wolfDistance<7 && wolfDistance>2.2 ? "walk" : "idle";
+    (multiplayer.connected? onlineWolf?.phase==="windup" : wolfStrikeAt>0) ? "idle" :
+    (multiplayer.connected ? onlineWolf?.phase==="chase" : wolfDistance<7 && wolfDistance>2.2) ? "walk" : "idle";
+  if(multiplayer.connected&&onlineWolf){
+    wolf.position.y=groundHeightAt(wolf.position.x,wolf.position.z);
+    wolf.rotation.y=onlineWolf.heading;
+  }
   wolfAsset?.setState(wolfState);
   wolfAsset?.update(dt);
-  if(wolfHealth>0){
+  if(!multiplayer.connected && wolfHealth>0){
     const dx=avatar.position.x-wolf.position.x, dz=avatar.position.z-wolf.position.z;
     const range=Math.hypot(dx,dz);
     wolf.lookAt(avatar.position.x,0,avatar.position.z);

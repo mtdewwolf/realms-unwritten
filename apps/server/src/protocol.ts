@@ -1,5 +1,5 @@
 /** Wire format v1. Do not treat client messages as authoritative positions. */
-export const PROTOCOL_VERSION=1;
+export const PROTOCOL_VERSION=2;
 export const MOVEMENT_SPEED=5.5;
 export const WORLD_HALF_EXTENT=8192;
 export const AOI_RADIUS=160;
@@ -7,11 +7,15 @@ export const SIMULATION_HZ=20;
 export const SNAPSHOT_HZ=10;
 export interface InputMessage {type:"input";seq:number;dx:number;dz:number}
 export interface HelloMessage {type:"hello";token?:string;name?:string}
-export type ClientMessage=InputMessage|HelloMessage;
+export type CombatActionMessage={type:"action";seq:number;action:"attack"|"dodge";target?:string};
+export type ClientMessage=InputMessage|HelloMessage|CombatActionMessage;
 export interface PlayerState {id:string;name:string;x:number;z:number;heading:number}
-export interface WelcomeMessage {type:"welcome";protocol:1;id:string;token:string;player:PlayerState}
-export interface SnapshotMessage {type:"snapshot";tick:number;you:PlayerState;others:PlayerState[];ack:number}
-export type ServerMessage=WelcomeMessage|SnapshotMessage|{type:"error";message:string};
+export interface WelcomeMessage {type:"welcome";protocol:2;id:string;token:string;player:PlayerState}
+export interface CombatVital {health:number;stamina:number;maxHealth:number;maxStamina:number;alive:boolean}
+export interface CombatWolf {id:string;x:number;z:number;heading:number;health:number;maxHealth:number;phase:"idle"|"chase"|"windup"|"strike"|"dead";windupUntil:number}
+export interface SnapshotMessage {type:"snapshot";tick:number;you:PlayerState;others:PlayerState[];ack:number;vitals:CombatVital;wolf:CombatWolf|null}
+export type CombatActionResult={type:"action_result";seq:number;action:"attack"|"dodge";ok:boolean;reason?:string;wolfHealth:number;health:number;stamina:number};
+export type ServerMessage=WelcomeMessage|SnapshotMessage|CombatActionResult|{type:"error";message:string};
 export function validateInput(input:unknown):InputMessage|null{
   if(!input||typeof input!=="object")return null;
   const m=input as Record<string,unknown>;

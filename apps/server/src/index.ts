@@ -4,6 +4,7 @@ import {createHash,randomBytes,randomUUID} from "node:crypto";
 import {mkdirSync} from "node:fs";
 import {dirname} from "node:path";
 import {WorldSimulation,view} from "./simulation";
+import {CombatSimulation} from "./combat";
 import {PROTOCOL_VERSION,SIMULATION_HZ,SNAPSHOT_HZ,validateHello,type ServerMessage} from "./protocol";
 
 const dbFile=process.env.WORLD_DB_PATH||"data/realms-world.sqlite";
@@ -15,6 +16,7 @@ const fetchCharacter=db.query<Stored,[string]>("SELECT id,name,x,z FROM characte
 const insertCharacter=db.query("INSERT INTO characters (id,token_hash,name,x,z,updated_at) VALUES (?,?,?,?,?,?)");
 const saveCharacter=db.query("UPDATE characters SET x=?,z=?,updated_at=? WHERE id=?");
 const world=new WorldSimulation();
+const combat=new CombatSimulation(world);
 type Session={playerId:string|null; token:string|null; lastInputAt:number;messages:number; windowStart:number};
 const socketByPlayer=new Map<string,ServerWebSocket<Session>>();
 const hash=(token:string)=>createHash("sha256").update(token).digest("hex");
@@ -32,6 +34,7 @@ function disconnect(ws:ServerWebSocket<Session>):void{
   save(id);
   socketByPlayer.delete(id);
   world.remove(id);
+  combat.leave(id);
   ws.data.playerId=null;
 }
 const server=Bun.serve<Session>({
@@ -39,7 +42,7 @@ const server=Bun.serve<Session>({
   port:Number(process.env.PORT||3001),
   fetch(req,server){
     const url=new URL(req.url);
-    if(url.pathname==="/health")return Response.json({ok:true,game:"realms-unwritten",protocol:PROTOCOL_VERSION,players:world.players.size});
+    if(url.pathname==="/health")return Response.json({ok:true,game:"realms-unwritten",protocol:PROTOCOL_VERSION,players:world.players.size,wolfHealth:combat.wolf.health});
     if(url.pathname==="/ws"){
       // A public deployment must implement TLS, origin policy, auth and rate limiting at the edge.
       const ok=server.upgrade(req,{data:{playerId:null,token:null,lastInputAt:Date.now(),messages:0,windowStart:Date.now()}});
@@ -75,8 +78,14 @@ const server=Bun.serve<Session>({
         }
         ws.data.playerId=stored.id;ws.data.token=token;
         const player=world.add(stored.id,stored.name,stored.x,stored.z);
+        combat.join(stored.id);
         socketByPlayer.set(stored.id,ws);
         send(ws,{type:"welcome",protocol:PROTOCOL_VERSION,id:stored.id,token,player:view(player)});
+        return;
+      }
+      if((packet as {type?:unknown})?.type==="action"){
+        const result=combat.action(ws.data.playerId,packet);
+        if(result)send(ws,result);
         return;
       }
       if((packet as {type?:unknown})?.type==="input"){
@@ -91,12 +100,15 @@ const simulation=setInterval(()=>{
   for(const [id,ws] of socketByPlayer){
     if(now-ws.data.lastInputAt>400){const player=world.players.get(id);if(player){player.dx=0;player.dz=0;}}
   }
+  for(const [id,p] of world.players)if(combat.players.get(id)?.alive===false){p.dx=0;p.dz=0;}
   world.tick();
+  combat.tick();
 },1000/SIMULATION_HZ);
 const broadcast=setInterval(()=>{
   for(const [id,ws] of socketByPlayer){
     const snapshot=world.snapshot(id);
-    if(snapshot)send(ws,snapshot);
+    const vitals=combat.vital(id);
+    if(snapshot&&vitals)send(ws,{...snapshot,vitals,wolf:Math.hypot(snapshot.you.x-combat.wolf.x,snapshot.you.z-combat.wolf.z)<=160?combat.wolfView():null});
   }
 },1000/SNAPSHOT_HZ);
 const persistence=setInterval(()=>{
