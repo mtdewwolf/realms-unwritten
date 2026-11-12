@@ -119,7 +119,7 @@ const status = document.querySelector<HTMLElement>("#status")!;
 const coordinates = document.querySelector<HTMLElement>("#world-coordinates")!;
 const exploration = document.querySelector<HTMLElement>("#exploration")!;
 const atlas = new WorldMap(app);
-const inventoryPanel=new InventoryPanel(app);
+const inventoryPanel=new InventoryPanel(app,item=>multiplayer.sendEquip(item));
 const questPanel=new QuestPanel(app,scene,action=>multiplayer.sendQuest(action));
 const characterPanel=new CharacterPanel(app,()=>multiplayer.requestProgression());
 inventoryPanel.button.addEventListener("click",()=>multiplayer.requestInventory());

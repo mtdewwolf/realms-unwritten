@@ -107,7 +107,14 @@ async function run(){
   const progression=await progressionReply;
   if(progression.level!==1||progression.xp!==0||progression.attributes.strength!==5)
     throw Error("Unexpected new-character progression: "+JSON.stringify(progression));
-  console.log("PASS multiplayer smoke: movement, shared wolf, inventory, quest and initial progression");
+  const equipReply=waitFor(first.socket,"equip_result");
+  first.socket.send(JSON.stringify({type:"equip",item:"fangblade"}));
+  const denial=await equipReply;
+  if(denial.ok)throw Error("Unearned Fangblade was equipped");
+  const starterReply=waitFor(first.socket,"equip_result");
+  first.socket.send(JSON.stringify({type:"equip",item:"starter-sword"}));
+  if(!(await starterReply).ok)throw Error("Starter weapon equip rejected");
+  console.log("PASS multiplayer smoke: shared combat, quest, progression and equipment ownership");
 }
 try{await run();}
 finally{

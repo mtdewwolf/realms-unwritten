@@ -14,7 +14,7 @@ describe("durable loot and inventory",()=>{
    const db=database(),store=new InventoryStore(db),event="wolf-kill-"+randomUUID();
    expect(store.grantWolfKill(event,"a")?.coins).toBe(5);
    expect(store.grantWolfKill(event,"a")).toBeNull();
-   expect(store.read("a")).toEqual({type:"inventory",coins:5,items:[
+   expect(store.read("a")).toEqual({type:"inventory",coins:5,equipped:{id:"starter-sword",name:"Worn Sword",bonusDamage:0},items:[
      {id:"wolf-fang",name:"Wolf Fang",quantity:1},
      {id:"wolf-pelt",name:"Wolf Pelt",quantity:1}]});
    const restored=new InventoryStore(db);
