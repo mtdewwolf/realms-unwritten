@@ -68,3 +68,6 @@
 
 #bag-equipment{padding:8px 4px;border:1px solid #829b8e85;border-radius:7px;margin:7px 0;font-size:12px}
 #bag-equipment button{display:block;margin-top:7px;background:#345e53;color:#fff;border:1px solid #93b1a4;border-radius:7px;padding:9px 12px;touch-action:manipulation}
+
+#bag-craft{width:100%;margin-top:12px;padding:11px;border:1px solid #bdac75;border-radius:9px;background:#495d37;color:#fff7d9;font-weight:700;touch-action:manipulation}
+#bag-craft:disabled{opacity:.45}

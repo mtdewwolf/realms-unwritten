@@ -119,7 +119,7 @@ const status = document.querySelector<HTMLElement>("#status")!;
 const coordinates = document.querySelector<HTMLElement>("#world-coordinates")!;
 const exploration = document.querySelector<HTMLElement>("#exploration")!;
 const atlas = new WorldMap(app);
-const inventoryPanel=new InventoryPanel(app,item=>multiplayer.sendEquip(item));
+const inventoryPanel=new InventoryPanel(app,item=>multiplayer.sendEquip(item),()=>multiplayer.sendCraft());
 const questPanel=new QuestPanel(app,scene,action=>multiplayer.sendQuest(action));
 const characterPanel=new CharacterPanel(app,()=>multiplayer.requestProgression());
 inventoryPanel.button.addEventListener("click",()=>multiplayer.requestInventory());
@@ -285,7 +285,8 @@ function dodge() {
 }
 document.querySelector("#attack")!.addEventListener("click", attack);
 document.querySelector("#gather")!.addEventListener("click", () => {
-  status.textContent="Gathering needs an authoritative world server (planned).";
+  if(multiplayer.connected){multiplayer.sendGather();return;}
+  status.textContent="Connect to the Bun server to mine Ironstone Outcrops.";
 });
 const dodgeButton = document.createElement("button");
 dodgeButton.id="dodge";

@@ -53,7 +53,7 @@ Status meanings: **Implemented** = present in source and exercised by automated 
 | Server-authoritative combat/AI | **Prototype** | One synchronized Bun wolf encounter; no broader AI/spawn/loot system |
 | Inventory, equipment, loot | **Prototype** | Worn Sword/Fangblade equipment, server-owned damage bonuses, wolf materials and coins |
 | Skills, XP, leveling, classes | **Prototype** | Server-owned XP, levels, derived attributes, Android HERO panel; no classes or skills |
-| Gathering, crafting, economy | **Planned** | Gather button currently reports feature is pending |
+| Gathering, crafting, economy | **Prototype** | Bun validates ore gathering, shared cooldown and Ironblade recipe; no wider economy |
 | NPC dialogue, quests, merchants | **Prototype** | Verdant Reach guard offers one persistent Wolf Hunt quest; no dialogue trees or merchants |
 | Chat, party, guilds, dungeons | **Planned** | No social or cooperative gameplay |
 | Production hosting and scale | **Planned** | No managed deployment, sharding, autoscaling or load-test results |
@@ -214,7 +214,7 @@ Server entry point: `apps/server/src/index.ts`. Core movement: `simulation.ts`. 
 - `GET /ws` with WebSocket upgrade: multiplayer connection.
 - Default port: **3001**; configurable via `PORT`.
 - Bind address: `0.0.0.0` by default; override via `HOST`.
-- Protocol version: **6** (client/server must use matching builds).
+- Protocol version: **7** (client/server must use matching builds).
 - Clients send `hello` with an optional existing guest token and optional sanitized display name; server sends `welcome` with player ID, token, initial position.
 - Clients send numbered movement vectors, not positions; server clamps speed and world bounds.
 - Server returns `snapshot` containing own authoritative position, acknowledgment sequence and nearby players.
@@ -254,6 +254,10 @@ The server awards **15 XP** for each qualified wolf kill and **75 XP** upon the 
 ### Starter equipment and authoritative combat scaling
 
 Characters begin with a default **Worn Sword (+0 weapon damage)**. Completing Wolf Hunt awards a **Fangblade (+8 weapon damage)** in the server inventory; the BAG panel can equip either weapon. Bun verifies ownership and persists the selected weapon in SQLite. Attacks against the shared starter wolf calculate damage as **20 base + floor((Strength - 5) / 2) + equipped weapon bonus**. Strength derives from server XP/level; damage supplied by clients is ignored. At level 2, a Fangblade hit deals 29 damage (20 + 1 + 8). Inventory, equipped gear, and XP survive a server restart. Vitality and Agility are not yet applied to combat. Protocol **v6**. See [Equipment and Combat Stats](docs/EQUIPMENT_COMBAT.md).
+
+### Authoritative gathering and first crafting recipe
+
+Ironstone Outcrops are deterministic world landmarks. Press **GATHER** within five meters of an ore landmark while online to receive **1 Iron Ore**. The server checks authoritative position, living status and each node's **30-second shared SQLite cooldown**; clients cannot submit alternate coordinates or mint their own ore. At the Verdant Reach guard/workshop, open BAG and craft an **Ironblade** from **2 Iron Ore + 1 Wolf Fang**. The recipe atomically deducts materials and creates an equippable **Ironblade (+12 damage)**. Offline gathering and crafting are not supported. Protocol v7. See [Gathering and Crafting](docs/GATHERING_CRAFTING.md).
 
 ### Guest persistence
 
@@ -501,7 +505,7 @@ Run this in addition to `bun test`; it is not a normal `test/*.test.ts` unit tes
    curl -fsS http://127.0.0.1:3001/health
    ```
 
-3. Verify response has `"ok":true`, protocol version `6`, and the online player count.
+3. Verify response has `"ok":true`, protocol version `7`, and the online player count.
 4. Open the client and connect to `ws://127.0.0.1:3001/ws` (when client and server are on the same machine).
 5. Confirm the connection-status message switches to online. Disconnect and verify offline exploration continues.
 6. In the terminal, check for runtime exceptions and ensure the server remains running.
@@ -659,7 +663,7 @@ adb logcat > android-session.log
 - [ ] Android Gradle `assembleDebug` succeeds and artifact exists.
 - [ ] Offline exploration still works.
 - [ ] Two distinct guest clients can connect and see movement.
-- [ ] In protocol v6, they agree on shared wolf HP/phase and rejected forged attacks.
+- [ ] In protocol v7, they agree on shared wolf HP/phase and rejected forged attacks.
 - [ ] Position persistence survives a graceful restart.
 - [ ] World chunks, road geometry, map and discovery states remain stable.
 - [ ] Real Android device boot/controls/performance verified for release candidates.
@@ -773,6 +777,7 @@ Frequency:
 - [Wolf Hunt Quest](docs/WOLF_HUNT_QUEST.md)
 - [Character Progression](docs/CHARACTER_PROGRESSION.md)
 - [Equipment and Combat Stats](docs/EQUIPMENT_COMBAT.md)
+- [Gathering and Crafting](docs/GATHERING_CRAFTING.md)
 - [World Streaming](docs/WORLD_STREAMING.md)
 - [Terrain and Biomes](docs/TERRAIN_BIOMES.md)
 - [World Landmarks / Content](docs/WORLD_CONTENT.md)

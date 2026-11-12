@@ -10,7 +10,7 @@ export interface ServerWolf{id:string;x:number;z:number;heading:number;health:nu
 export interface ServerVitals{health:number;stamina:number;maxHealth:number;maxStamina:number;alive:boolean}
 interface Snapshot{type:"snapshot";tick:number;you:PlayerState;others:PlayerState[];ack:number;vitals:ServerVitals;wolf:ServerWolf|null}
 export interface CombatActionResult{type:"action_result";seq:number;action:"attack"|"dodge";ok:boolean;reason?:string;wolfHealth:number;health:number;stamina:number}
-type ServerMessage={type:"equip_result";ok:boolean;reason?:string}|{type:"welcome";protocol:number;id:string;token:string;player:PlayerState}|Snapshot|CombatActionResult|InventoryState|RewardEvent|QuestState|QuestResult|ProgressionState|{type:"error";message:string};
+type ServerMessage={type:"resource_result";action:"gather"|"craft";ok:boolean;reason?:string;item?:string;amount?:number}|{type:"equip_result";ok:boolean;reason?:string}|{type:"welcome";protocol:number;id:string;token:string;player:PlayerState}|Snapshot|CombatActionResult|InventoryState|RewardEvent|QuestState|QuestResult|ProgressionState|{type:"error";message:string};
 export interface MovementInput{dx:number;dz:number}
 const TOKEN_KEY="realms-unwritten-guest-token-v1";
 function storedToken():string|null{try{return localStorage.getItem(TOKEN_KEY);}catch{return null;}}
@@ -38,7 +38,7 @@ export class MultiplayerClient {
       try{message=JSON.parse(String(event.data)) as ServerMessage;}catch{return;}
       if(message.type==="error"){this.status(message.message);return;}
       if(message.type==="welcome"){
-        if(message.protocol!==6){ws.close();this.status("Incompatible server protocol");return;}
+        if(message.protocol!==7){ws.close();this.status("Incompatible server protocol");return;}
         this.id=message.id;saveToken(message.token);this.online=true;
         this.avatar.position.x=message.player.x;this.avatar.position.z=message.player.z;
         this.status("Online · authoritative movement connected");return;
@@ -46,6 +46,7 @@ export class MultiplayerClient {
       if(message.type==="progression"){this.onProgression(message);return;}
       if(message.type==="quest_status"){this.onQuest(message);return;}
       if(message.type==="quest_result"){this.onQuestResult(message);return;}
+      if(message.type==="resource_result"){this.status(message.ok?(message.action==="gather"?"Gathered ":"Crafted ")+(message.item??"item"):"Resource action rejected: "+(message.reason??"Unavailable"));return;}
       if(message.type==="equip_result"){this.status(message.ok?"Weapon equipped":message.reason??"Equipment change rejected");return;}
       if(message.type==="inventory"){this.onInventory(message);return;}
       if(message.type==="reward"){this.onReward(message);return;}
@@ -95,7 +96,15 @@ export class MultiplayerClient {
     this.socket!.send(JSON.stringify({type:"progression"}));
     return true;
   }
-  sendEquip(item:"starter-sword"|"fangblade"):boolean{
+  sendGather():boolean{
+    if(!this.connected)return false;
+    this.socket!.send(JSON.stringify({type:"gather"}));return true;
+  }
+  sendCraft():boolean{
+    if(!this.connected)return false;
+    this.socket!.send(JSON.stringify({type:"craft",recipe:"ironblade"}));return true;
+  }
+  sendEquip(item:"starter-sword"|"fangblade"|"ironblade"):boolean{
     if(!this.connected)return false;
     this.socket!.send(JSON.stringify({type:"equip",item}));return true;
   }

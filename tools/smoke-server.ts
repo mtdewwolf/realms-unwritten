@@ -114,7 +114,14 @@ async function run(){
   const starterReply=waitFor(first.socket,"equip_result");
   first.socket.send(JSON.stringify({type:"equip",item:"starter-sword"}));
   if(!(await starterReply).ok)throw Error("Starter weapon equip rejected");
-  console.log("PASS multiplayer smoke: shared combat, quest, progression and equipment ownership");
+  const gather=waitFor(first.socket,"resource_result");
+  first.socket.send(JSON.stringify({type:"gather",x:1000,z:1000}));
+  const rejected=await gather;
+  if(rejected.ok||rejected.action!=="gather")throw Error("Client-forged gathering coordinates accepted");
+  const craft=waitFor(first.socket,"resource_result");
+  first.socket.send(JSON.stringify({type:"craft",recipe:"ironblade",ore:999}));
+  if((await craft).ok)throw Error("Free item crafting accepted");
+  console.log("PASS multiplayer smoke: shared combat, quest, equipment and rejected forged gathering/crafting");
 }
 try{await run();}
 finally{
