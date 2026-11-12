@@ -15,7 +15,7 @@ export type ServerMessage=WelcomeMessage|SnapshotMessage|{type:"error";message:s
 export function validateInput(input:unknown):InputMessage|null{
   if(!input||typeof input!=="object")return null;
   const m=input as Record<string,unknown>;
-  if(m.type!=="input"||!Number.isSafeInteger(m.seq)||Number(m.seq)<0||!Number.isFinite(m.dx)||!Number.isFinite(m.dz))return null;
+  if(m.type!=="input"||typeof m.seq!=="number"||!Number.isSafeInteger(m.seq)||m.seq<0||typeof m.dx!=="number"||typeof m.dz!=="number"||!Number.isFinite(m.dx)||!Number.isFinite(m.dz))return null;
   if(typeof m.dx!=="number"||typeof m.dz!=="number"||Math.abs(m.dx)>1.01||Math.abs(m.dz)>1.01)return null;
   return {type:"input",seq:m.seq as number,dx:m.dx,dz:m.dz};
 }
