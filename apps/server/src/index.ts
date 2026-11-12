@@ -1,3 +1,4 @@
+import type {ServerWebSocket} from "bun";
 import {Database} from "bun:sqlite";
 import {createHash,randomBytes,randomUUID} from "node:crypto";
 import {mkdirSync} from "node:fs";
@@ -10,21 +11,21 @@ if(dbFile!==":memory:")mkdirSync(dirname(dbFile),{recursive:true});
 const db=new Database(dbFile,{create:true});
 db.exec("PRAGMA journal_mode = WAL; CREATE TABLE IF NOT EXISTS characters (id TEXT PRIMARY KEY, token_hash TEXT UNIQUE NOT NULL, name TEXT NOT NULL, x REAL NOT NULL, z REAL NOT NULL, updated_at INTEGER NOT NULL)");
 type Stored={id:string;name:string;x:number;z:number};
-const fetchCharacter=db.query("SELECT id,name,x,z FROM characters WHERE token_hash = ?").as(Stored);
+const fetchCharacter=db.query<Stored,[string]>("SELECT id,name,x,z FROM characters WHERE token_hash = ?");
 const insertCharacter=db.query("INSERT INTO characters (id,token_hash,name,x,z,updated_at) VALUES (?,?,?,?,?,?)");
 const saveCharacter=db.query("UPDATE characters SET x=?,z=?,updated_at=? WHERE id=?");
 const world=new WorldSimulation();
 type Session={playerId:string|null; token:string|null; lastInputAt:number;messages:number; windowStart:number};
-const socketByPlayer=new Map<string,ServerSocket<Session>>();
+const socketByPlayer=new Map<string,ServerWebSocket<Session>>();
 const hash=(token:string)=>createHash("sha256").update(token).digest("hex");
 const save=(id:string)=>{
   const p=world.players.get(id);
   if(p)saveCharacter.run(p.x,p.z,Date.now(),id);
 };
-function send(ws:ServerSocket<Session>,message:ServerMessage):void{
+function send(ws:ServerWebSocket<Session>,message:ServerMessage):void{
   if(ws.readyState===1)ws.send(JSON.stringify(message));
 }
-function disconnect(ws:ServerSocket<Session>):void{
+function disconnect(ws:ServerWebSocket<Session>):void{
   const id=ws.data.playerId;
   if(!id)return;
   if(socketByPlayer.get(id)!==ws)return;
@@ -88,7 +89,7 @@ const server=Bun.serve<Session>({
 const simulation=setInterval(()=>{
   const now=Date.now();
   for(const [id,ws] of socketByPlayer){
-    if(now-ws.data.lastInputAt>400)world.input(id,{type:"input",seq:(world.players.get(id)?.lastSeq??0)+1,dx:0,dz:0});
+    if(now-ws.data.lastInputAt>400){const player=world.players.get(id);if(player){player.dx=0;player.dz=0;}}
   }
   world.tick();
 },1000/SIMULATION_HZ);
