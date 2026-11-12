@@ -41,6 +41,8 @@ jobs:
           mkdir -p apps/client/public/assets
           blender --background --factory-startup --python-exit-code 1 --python tools/blender/generate_characters.py -- --out apps/client/public/assets
           python3 tools/blender/validate_glb.py apps/client/public/assets
+      - name: Run server WebSocket smoke test
+        run: bun tools/smoke-server.ts
       - name: Build web client
         run: bun run build
       - name: Create native Android project
