@@ -1,17 +1,17 @@
 import {Database} from "bun:sqlite";
-export type ItemId="wolf-pelt"|"wolf-fang"|"fangblade";
-export type WeaponId="starter-sword"|"fangblade";
+export type ItemId="wolf-pelt"|"wolf-fang"|"fangblade"|"iron-ore"|"ironblade";
+export type WeaponId="starter-sword"|"fangblade"|"ironblade";
 export interface EquippedWeapon{id:WeaponId;name:string;bonusDamage:number}
-export function weaponDetails(id:WeaponId):EquippedWeapon{return id==="fangblade"?{id,name:"Fangblade",bonusDamage:8}:{id,name:"Worn Sword",bonusDamage:0};}
+export function weaponDetails(id:WeaponId):EquippedWeapon{return id==="ironblade"?{id,name:"Ironblade",bonusDamage:12}:id==="fangblade"?{id,name:"Fangblade",bonusDamage:8}:{id,name:"Worn Sword",bonusDamage:0};}
 export interface InventoryItem{id:ItemId;name:string;quantity:number}
 export interface InventoryView{type:"inventory";items:InventoryItem[];coins:number;equipped:EquippedWeapon}
 export interface RewardView{type:"reward";eventId:string;items:InventoryItem[];coins:number}
-const NAMES:Record<ItemId,string>={"wolf-fang":"Wolf Fang","wolf-pelt":"Wolf Pelt","fangblade":"Fangblade"};
+const NAMES:Record<ItemId,string>={"wolf-fang":"Wolf Fang","wolf-pelt":"Wolf Pelt","fangblade":"Fangblade","iron-ore":"Iron Ore","ironblade":"Ironblade"};
 export class InventoryStore {
   private readonly grant;
   constructor(private readonly db:Database){
     db.exec("CREATE TABLE IF NOT EXISTS inventory_stacks(character_id TEXT NOT NULL,item_id TEXT NOT NULL,quantity INTEGER NOT NULL CHECK(quantity>=0),PRIMARY KEY(character_id,item_id),FOREIGN KEY(character_id) REFERENCES characters(id));");
-    db.exec("CREATE TABLE IF NOT EXISTS equipment(character_id TEXT PRIMARY KEY,weapon_id TEXT NOT NULL CHECK(weapon_id IN ('starter-sword','fangblade')),FOREIGN KEY(character_id) REFERENCES characters(id));");
+    db.exec("CREATE TABLE IF NOT EXISTS equipment(character_id TEXT PRIMARY KEY,weapon_id TEXT NOT NULL CHECK(weapon_id IN ('starter-sword','fangblade','ironblade')),FOREIGN KEY(character_id) REFERENCES characters(id));");
     db.exec("CREATE TABLE IF NOT EXISTS wallets(character_id TEXT PRIMARY KEY,coins INTEGER NOT NULL CHECK(coins>=0),FOREIGN KEY(character_id) REFERENCES characters(id));");
     db.exec("CREATE TABLE IF NOT EXISTS reward_receipts(event_id TEXT NOT NULL,character_id TEXT NOT NULL,created_at INTEGER NOT NULL,PRIMARY KEY(event_id,character_id),FOREIGN KEY(character_id) REFERENCES characters(id));");
     const receipt=db.query("INSERT OR IGNORE INTO reward_receipts VALUES (?,?,?)");
@@ -32,14 +32,31 @@ export class InventoryStore {
   grantQuestWeapon(id:string):void{
     this.db.query("INSERT INTO inventory_stacks(character_id,item_id,quantity) VALUES (?,'fangblade',1) ON CONFLICT(character_id,item_id) DO UPDATE SET quantity=quantity+1").run(id);
   }
+  creditOre(id:string,quantity:number):void{
+    if(!Number.isSafeInteger(quantity)||quantity<=0||quantity>10)throw Error("Invalid ore grant");
+    this.db.query("INSERT INTO inventory_stacks(character_id,item_id,quantity) VALUES (?,'iron-ore',?) ON CONFLICT(character_id,item_id) DO UPDATE SET quantity=quantity+excluded.quantity").run(id,quantity);
+  }
+  /** Consumes materials and creates output in one SQLite transaction. */
+  craftIronblade(id:string):boolean{
+    return this.db.transaction(()=>{
+      const rows=this.db.query<{item_id:string;quantity:number},[string]>("SELECT item_id,quantity FROM inventory_stacks WHERE character_id=? AND item_id IN ('iron-ore','wolf-fang')").all(id);
+      const available=new Map(rows.map(r=>[r.item_id,r.quantity]));
+      if((available.get("iron-ore")??0)<2||(available.get("wolf-fang")??0)<1)return false;
+      const subtract=this.db.query("UPDATE inventory_stacks SET quantity=quantity-? WHERE character_id=? AND item_id=? AND quantity>=?");
+      if(subtract.run(2,id,"iron-ore",2).changes!==1)throw Error("Ore deduction failed");
+      if(subtract.run(1,id,"wolf-fang",1).changes!==1)throw Error("Fang deduction failed");
+      this.db.query("INSERT INTO inventory_stacks(character_id,item_id,quantity) VALUES (?,'ironblade',1) ON CONFLICT(character_id,item_id) DO UPDATE SET quantity=quantity+1").run(id);
+      return true;
+    })();
+  }
   equipped(id:string):EquippedWeapon{
     const row=this.db.query<{weapon_id:string},[string]>("SELECT weapon_id FROM equipment WHERE character_id=?").get(id);
-    return weaponDetails(row?.weapon_id==="fangblade"?"fangblade":"starter-sword");
+    return weaponDetails(row?.weapon_id==="fangblade"?"fangblade":row?.weapon_id==="ironblade"?"ironblade":"starter-sword");
   }
   equip(id:string,weapon:WeaponId):boolean{
-    if(weapon!=="starter-sword"&&weapon!=="fangblade")return false;
-    if(weapon==="fangblade"){
-      const owned=this.db.query<{quantity:number},[string]>("SELECT quantity FROM inventory_stacks WHERE character_id=? AND item_id='fangblade'").get(id);
+    if(weapon!=="starter-sword"&&weapon!=="fangblade"&&weapon!=="ironblade")return false;
+    if(weapon!=="starter-sword"){
+      const owned=this.db.query<{quantity:number},[string]>("SELECT quantity FROM inventory_stacks WHERE character_id=? AND item_id=?").get(id,weapon);
       if(!owned||owned.quantity<1)return false;
     }
     this.db.query("INSERT INTO equipment(character_id,weapon_id) VALUES (?,?) ON CONFLICT(character_id) DO UPDATE SET weapon_id=excluded.weapon_id").run(id,weapon);
@@ -48,7 +65,7 @@ export class InventoryStore {
   read(id:string):InventoryView{
     const rows=this.db.query<{item_id:string;quantity:number},[string]>("SELECT item_id,quantity FROM inventory_stacks WHERE character_id=? ORDER BY item_id").all(id);
     const wallet=this.db.query<{coins:number},[string]>("SELECT coins FROM wallets WHERE character_id=?").get(id);
-    const items:InventoryItem[]=rows.filter(r=>r.item_id==="wolf-fang"||r.item_id==="wolf-pelt"||r.item_id==="fangblade").map(r=>({id:r.item_id as ItemId,name:NAMES[r.item_id as ItemId],quantity:r.quantity}));
+    const items:InventoryItem[]=rows.filter(r=>r.item_id==="wolf-fang"||r.item_id==="wolf-pelt"||r.item_id==="fangblade"||r.item_id==="iron-ore"||r.item_id==="ironblade").map(r=>({id:r.item_id as ItemId,name:NAMES[r.item_id as ItemId],quantity:r.quantity}));
     return {type:"inventory",items,coins:wallet?.coins??0,equipped:this.equipped(id)};
   }
 }

@@ -8,6 +8,7 @@ import {CombatSimulation} from "./combat";
 import {InventoryStore} from "./inventory";
 import {QuestStore,closeToGuard,parseQuestCommand} from "./quests";
 import {ProgressionStore} from "./progression";
+import {ResourceService} from "./resources";
 import {PROTOCOL_VERSION,SIMULATION_HZ,SNAPSHOT_HZ,validateHello,type ServerMessage} from "./protocol";
 
 const dbFile=process.env.WORLD_DB_PATH||"data/realms-world.sqlite";
@@ -23,6 +24,7 @@ const combat=new CombatSimulation(world);
 const inventory=new InventoryStore(db);
 const progression=new ProgressionStore(db);
 const quests=new QuestStore(db,progression,inventory);
+const resources=new ResourceService(db,inventory);
 combat.resolveAttackDamage=id=>20+Math.floor((progression.read(id).attributes.strength-5)/2)+inventory.equipped(id).bonusDamage;
 type Session={playerId:string|null; token:string|null; lastInputAt:number;messages:number; windowStart:number};
 const socketByPlayer=new Map<string,ServerWebSocket<Session>>();
@@ -125,13 +127,26 @@ const server=Bun.serve<Session>({
         }
         return;
       }
+      if((packet as {type?:unknown})?.type==="gather"||(packet as {type?:unknown})?.type==="craft"){
+        const id=ws.data.playerId;
+        const actor=world.players.get(id);
+        const alive=combat.players.get(id)?.alive===true;
+        if(!actor){send(ws,{type:"error",message:"Character unavailable"});return;}
+        const kind=(packet as {type?:unknown}).type;
+        const result=kind==="gather"
+          ?resources.gather(id,actor.x,actor.z,alive)
+          :resources.craft(id,actor.x,actor.z,alive,(packet as {recipe?:unknown}).recipe);
+        send(ws,result);
+        if(result.ok)send(ws,inventory.read(id));
+        return;
+      }
       if((packet as {type?:unknown})?.type==="progression"){
         send(ws,progression.read(ws.data.playerId));
         return;
       }
       if((packet as {type?:unknown})?.type==="equip"){
         const requested=(packet as {item?:unknown}).item;
-        const ok=(requested==="starter-sword"||requested==="fangblade")&&inventory.equip(ws.data.playerId,requested);
+        const ok=(requested==="starter-sword"||requested==="fangblade"||requested==="ironblade")&&inventory.equip(ws.data.playerId,requested);
         send(ws,{type:"equip_result",ok,reason:ok?undefined:"Weapon is unavailable or not owned"});
         send(ws,inventory.read(ws.data.playerId));
         return;
