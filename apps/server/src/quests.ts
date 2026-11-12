@@ -1,5 +1,6 @@
 import { Database } from "bun:sqlite";
 import type { ProgressionStore } from "./progression";
+import type { InventoryStore } from "./inventory";
 
 export const WOLF_HUNT_ID="verdant-wolf-hunt";
 export const GUARD_X=2;
@@ -39,7 +40,7 @@ export class QuestStore {
   private readonly acceptTx;
   private readonly killTx;
   private readonly turninTx;
-  constructor(private readonly db:Database,private readonly progression?:ProgressionStore){
+  constructor(private readonly db:Database,private readonly progression?:ProgressionStore,private readonly inventory?:InventoryStore){
     db.exec("CREATE TABLE IF NOT EXISTS quest_progress(character_id TEXT NOT NULL,quest_id TEXT NOT NULL,stage TEXT NOT NULL CHECK(stage IN ('active','ready','completed')),kills INTEGER NOT NULL DEFAULT 0 CHECK(kills>=0 AND kills<=3),PRIMARY KEY(character_id,quest_id),FOREIGN KEY(character_id) REFERENCES characters(id));");
     db.exec("CREATE TABLE IF NOT EXISTS quest_kill_receipts(character_id TEXT NOT NULL,quest_id TEXT NOT NULL,event_id TEXT NOT NULL,PRIMARY KEY(character_id,quest_id,event_id),FOREIGN KEY(character_id) REFERENCES characters(id));");
     const read=db.query<ProgressRow,[string,string]>("SELECT stage,kills FROM quest_progress WHERE character_id=? AND quest_id=?");
@@ -59,6 +60,7 @@ export class QuestStore {
     this.turninTx=db.transaction((id:string)=>{
       if(complete.run(id,WOLF_HUNT_ID).changes!==1)return false;
       wallet.run(id,WOLF_HUNT_COINS);
+      this.inventory?.grantQuestWeapon(id);
       if(this.progression&&!this.progression.grantQuest(id))throw new Error("Quest progression receipt already exists");
       return true;
     });

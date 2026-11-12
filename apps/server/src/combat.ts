@@ -45,6 +45,7 @@ export class CombatSimulation {
   time=0;
   readonly contributors=new Set<string>();
   onWolfDefeated:((eventId:string,contributors:readonly string[])=>void)|null=null;
+  resolveAttackDamage:((characterId:string)=>number)|null=null;
   constructor(readonly world:WorldSimulation){}
   join(id:string):void{
     this.players.set(id,{health:MAX_HEALTH,stamina:MAX_STAMINA,maxHealth:MAX_HEALTH,maxStamina:MAX_STAMINA,
@@ -91,7 +92,8 @@ export class CombatSimulation {
     p.attackReadyAt=this.time+.65;
     if(this.wolf.phase==="dead")return result(false,"wolf defeated");
     if(range(actor,this.wolf)>ATTACK_RANGE)return result(false,"target out of range");
-    this.wolf.health=Math.max(0,this.wolf.health-ATTACK_DAMAGE);
+    const damage=this.resolveAttackDamage?.(id)??ATTACK_DAMAGE;
+    this.wolf.health=Math.max(0,this.wolf.health-Math.max(1,Math.min(100,Math.floor(damage))));
     this.contributors.add(id);
     if(this.wolf.health===0){
       this.wolf.phase="dead";

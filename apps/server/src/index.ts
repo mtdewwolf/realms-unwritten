@@ -22,7 +22,8 @@ const world=new WorldSimulation();
 const combat=new CombatSimulation(world);
 const inventory=new InventoryStore(db);
 const progression=new ProgressionStore(db);
-const quests=new QuestStore(db,progression);
+const quests=new QuestStore(db,progression,inventory);
+combat.resolveAttackDamage=id=>20+Math.floor((progression.read(id).attributes.strength-5)/2)+inventory.equipped(id).bonusDamage;
 type Session={playerId:string|null; token:string|null; lastInputAt:number;messages:number; windowStart:number};
 const socketByPlayer=new Map<string,ServerWebSocket<Session>>();
 const hash=(token:string)=>createHash("sha256").update(token).digest("hex");
@@ -126,6 +127,13 @@ const server=Bun.serve<Session>({
       }
       if((packet as {type?:unknown})?.type==="progression"){
         send(ws,progression.read(ws.data.playerId));
+        return;
+      }
+      if((packet as {type?:unknown})?.type==="equip"){
+        const requested=(packet as {item?:unknown}).item;
+        const ok=(requested==="starter-sword"||requested==="fangblade")&&inventory.equip(ws.data.playerId,requested);
+        send(ws,{type:"equip_result",ok,reason:ok?undefined:"Weapon is unavailable or not owned"});
+        send(ws,inventory.read(ws.data.playerId));
         return;
       }
       if((packet as {type?:unknown})?.type==="inventory"){
