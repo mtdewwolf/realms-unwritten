@@ -58,7 +58,7 @@ Status meanings: **Implemented** = present in source and exercised by automated 
 | Chat, party, guilds, dungeons | **Planned** | No social or cooperative gameplay |
 | Production hosting and scale | **Planned** | No managed deployment, sharding, autoscaling or load-test results |
 
-**Last audited baseline:** branch \`Master\`, commit \`0c24d4e\` (November 2026). [Android / WebSocket smoke CI — passed](https://github.com/mtdewwolf/realms-unwritten/actions/runs/43148146024). This confirms a successful automated build and live two-client smoke test on a GitHub runner; **it is not evidence of real-device Android performance or production service reliability**.
+**Last audited baseline:** branch `Master`, commit `0c24d4e` (November 2026). [Android / WebSocket smoke CI — passed](https://github.com/mtdewwolf/realms-unwritten/actions/runs/43148146024). This confirms a successful automated build and live two-client smoke test on a GitHub runner; **it is not evidence of real-device Android performance or production service reliability**.
 
 ## Game vision and gameplay
 
@@ -93,14 +93,14 @@ The server does **not** currently share the wolf encounter, drops, discoveries o
 | Starter village | Flat center with a gradual transition to the terrain heightfield |
 | Biomes | Meadow, woodland, highlands; simple color/foliage variations |
 | Placement | Seeded procedural trees/rocks and location blockouts |
-| Ground samples | \`groundHeightAt()\` interpolates the same terrain triangles the renderer uses |
+| Ground samples | `groundHeightAt()` interpolates the same terrain triangles the renderer uses |
 | Distant detail | Scene fog and limited chunk window; no finished terrain LOD system |
 
-**How streaming works:** \`ChunkedWorld\` calculates the player's chunk from world coordinates, instantiates nearby chunks, evicts distant ones, and disposes per-chunk terrain and landmark geometry. Shared materials and standard geometries are reused. Generation is deterministic: returning to the same location recreates the same baseline terrain and objects.
+**How streaming works:** `ChunkedWorld` calculates the player's chunk from world coordinates, instantiates nearby chunks, evicts distant ones, and disposes per-chunk terrain and landmark geometry. Shared materials and standard geometries are reused. Generation is deterministic: returning to the same location recreates the same baseline terrain and objects.
 
 **What "16 km world" does NOT mean:** it is not 268 km² of hand-authored content. There are no rivers, cliffs, bridges, terrain deformation, reliable prop collisions, weather, mounts or fast-travel networks yet. Terrain generation is client-side; an MMO will need versioned shared world seeds, persistent world deltas, and server-controlled interactions.
 
-Source: \`apps/client/src/world/chunkedWorld.ts\`, \`terrain.ts\`, \`frontierProps.ts\`.
+Source: `apps/client/src/world/chunkedWorld.ts`, `terrain.ts`, `frontierProps.ts`.
 
 ## Characters, controls, combat, and animation
 
@@ -133,14 +133,14 @@ Joystick/camera pointers are reset when the window loses focus or the document i
 
 ### Character art
 
-\`tools/blender/generate_characters.py\` builds **original low-poly prototype** adventurer and wolf GLBs using Blender's Python API. Required animation clips:
+`tools/blender/generate_characters.py` builds **original low-poly prototype** adventurer and wolf GLBs using Blender's Python API. Required animation clips:
 
 | Character | Clips |
 | --- | --- |
-| Adventurer | \`idle\`, \`walk\`, \`attack\`, \`dodge\` |
-| Wolf | \`idle\`, \`walk\`, \`attack\`, \`death\` |
+| Adventurer | `idle`, `walk`, `attack`, `dodge` |
+| Wolf | `idle`, `walk`, `attack`, `death` |
 
-The client loads \`/assets/adventurer.glb\` and \`/assets/wolf.glb\` with \`GLTFLoader\` and animates them using \`AnimationMixer\`. If an asset is missing or invalid, the existing procedural character is retained as a fallback. Remote multiplayer players are currently simpler procedural avatars, not the full rigged animated GLB.
+The client loads `/assets/adventurer.glb` and `/assets/wolf.glb` with `GLTFLoader` and animates them using `AnimationMixer`. If an asset is missing or invalid, the existing procedural character is retained as a fallback. Remote multiplayer players are currently simpler procedural avatars, not the full rigged animated GLB.
 
 **Not production-ready:** mesh/UV quality, skeleton standards, animation transitions, weapon attachment, equipment swapping, damage reactions, LOD and actual Android GPU profiling.
 
@@ -175,14 +175,14 @@ Landmark IDs and positions are deterministic, based on 256-meter world regions a
 
 ### Device-local storage
 
-Currently stored in browser/WebView \`localStorage\`:
+Currently stored in browser/WebView `localStorage`:
 
 | Key | Purpose |
 | --- | --- |
-| \`realms-unwritten-map-v1\` | Explored 64-meter cells |
-| \`realms-unwritten-discoveries-v1\` | Landmark discovery IDs |
-| \`realms-unwritten-settlement-discoveries-v1\` | Settlement discovery IDs |
-| \`realms-unwritten-guest-token-v1\` | Guest bearer token for Bun server reconnect |
+| `realms-unwritten-map-v1` | Explored 64-meter cells |
+| `realms-unwritten-discoveries-v1` | Landmark discovery IDs |
+| `realms-unwritten-settlement-discoveries-v1` | Settlement discovery IDs |
+| `realms-unwritten-guest-token-v1` | Guest bearer token for Bun server reconnect |
 
 Data is **specific to that browser profile/device origin**, not synchronized across accounts. Clearing app data or browser storage can lose discoveries and the guest token. Do not treat localStorage as secure credential storage.
 
@@ -190,7 +190,7 @@ Data is **specific to that browser profile/device origin**, not synchronized acr
 
 ### Topology
 
-\`\`\`text
+```text
 Android Capacitor client / desktop browser
      │
      ├── Three.js terrain, map, local wolf encounter
@@ -204,42 +204,42 @@ Android Capacitor client / desktop browser
               ├── 10 Hz nearby player snapshots
               ├── Interest radius: 160 meters
               └── SQLite guest characters / saved positions
-\`\`\`
+```
 
-Server entry point: \`apps/server/src/index.ts\`. Core movement: \`simulation.ts\`. Message validation: \`protocol.ts\`. Client integration: \`apps/client/src/multiplayer/client.ts\`.
+Server entry point: `apps/server/src/index.ts`. Core movement: `simulation.ts`. Message validation: `protocol.ts`. Client integration: `apps/client/src/multiplayer/client.ts`.
 
 ### HTTP and WebSocket
 
-- \`GET /health\`: JSON with \`ok\`, \`game\`, protocol version and current online player count.
-- \`GET /ws\` with WebSocket upgrade: multiplayer connection.
-- Default port: **3001**; configurable via \`PORT\`.
-- Bind address: \`0.0.0.0\` by default; override via \`HOST\`.
+- `GET /health`: JSON with `ok`, `game`, protocol version and current online player count.
+- `GET /ws` with WebSocket upgrade: multiplayer connection.
+- Default port: **3001**; configurable via `PORT`.
+- Bind address: `0.0.0.0` by default; override via `HOST`.
 - Protocol version: **1**.
-- Clients send \`hello\` with an optional existing guest token and optional sanitized display name; server sends \`welcome\` with player ID, token, initial position.
+- Clients send `hello` with an optional existing guest token and optional sanitized display name; server sends `welcome` with player ID, token, initial position.
 - Clients send numbered movement vectors, not positions; server clamps speed and world bounds.
-- Server returns \`snapshot\` containing own authoritative position, acknowledgment sequence and nearby players.
+- Server returns `snapshot` containing own authoritative position, acknowledgment sequence and nearby players.
 - Basic per-WebSocket limit: 40 messages/second; maximum payload length 2,048 bytes. Input inactivity stops player motion after ~400 ms.
 - Nearby-player lookup currently scans all players per client (roughly quadratic), **not** production spatial indexing.
 
 Example messages (illustrative):
 
-\`\`\`json
+```json
 {"type":"hello","name":"Adventurer"}
-\`\`\`
+```
 
-\`\`\`json
+```json
 {"type":"input","seq":1,"dx":1,"dz":0}
-\`\`\`
+```
 
-\`\`\`json
+```json
 {"type":"snapshot","tick":42,"you":{"id":"...","name":"Adventurer","x":0,"z":0,"heading":0},"others":[],"ack":1}
-\`\`\`
+```
 
 ### Guest persistence
 
-- SQLite via Bun's \`bun:sqlite\`.
-- Default DB file: \`data/realms-world.sqlite\`, **relative to the server process's working directory** (when started via the root \`dev:server\` script, this is \`apps/server/data/realms-world.sqlite\`).
-- Override with \`WORLD_DB_PATH\`, preferably an absolute path for deployment.
+- SQLite via Bun's `bun:sqlite`.
+- Default DB file: `data/realms-world.sqlite`, **relative to the server process's working directory** (when started via the root `dev:server` script, this is `apps/server/data/realms-world.sqlite`).
+- Override with `WORLD_DB_PATH`, preferably an absolute path for deployment.
 - Server stores **hashes** of guest bearer tokens, names, IDs and x/z positions.
 - Positions are saved every ~10 seconds and on clean WebSocket disconnect / graceful shutdown.
 - There is no account recovery, password login, session renewal or character roster.
@@ -252,7 +252,7 @@ Example messages (illustrative):
 
 **Not authoritative:** combat, wolf state, health, stamina, dodge effects, terrain collision, gathering, map fog, discoveries, settlements, NPCs, inventory, currency, world edits and building ownership.
 
-**Not production-safe:** public plain-WS exposure, localStorage bearer tokens, missing origin policy, account security, load testing, persistent shared world state and horizontal scaling. Use a private LAN for early testing; public deployment requires \`wss://\`, an authentication strategy and protective controls.
+**Not production-safe:** public plain-WS exposure, localStorage bearer tokens, missing origin policy, account security, load testing, persistent shared world state and horizontal scaling. Use a private LAN for early testing; public deployment requires `wss://`, an authentication strategy and protective controls.
 
 ## Technology and repository layout
 
@@ -266,10 +266,10 @@ Example messages (illustrative):
 | Android build | Gradle + JDK 21 / Android SDK |
 | 3D asset automation | Blender 4.x / headless Python |
 | Multiplayer transport | Bun WebSocket |
-| Guest-character storage | SQLite (\`bun:sqlite\`) |
+| Guest-character storage | SQLite (`bun:sqlite`) |
 | Automation | GitHub Actions |
 
-\`\`\`text
+```text
 .
 ├── apps/
 │   ├── client/
@@ -295,7 +295,7 @@ Example messages (illustrative):
 └── .github/workflows/
     ├── android-debug-apk.yml
     └── blender-assets.yml
-\`\`\`
+```
 
 ## Prerequisites and local setup
 
@@ -304,64 +304,64 @@ Example messages (illustrative):
 1. Install [Bun](https://bun.sh/) (CI uses **1.3.3**), Git and a modern browser.
 2. Clone the repository and install workspaces:
 
-\`\`\`bash
+```bash
 git clone https://github.com/mtdewwolf/realms-unwritten.git
 cd realms-unwritten
 git switch Master
 bun install
-\`\`\`
+```
 
 3. Validate TypeScript and tests:
 
-\`\`\`bash
+```bash
 bun run check
 bun test
-\`\`\`
+```
 
 4. Start the server and web client in separate terminals:
 
-\`\`\`bash
+```bash
 bun run dev:server
 # Other terminal, from repository root:
 bun run dev:client
-\`\`\`
+```
 
-Or start both with \`bun run dev\`. Vite usually serves at \`http://localhost:5173\` unless that port is occupied. The Bun server is \`http://localhost:3001\` by default.
+Or start both with `bun run dev`. Vite usually serves at `http://localhost:5173` unless that port is occupied. The Bun server is `http://localhost:3001` by default.
 
-5. Open \`http://localhost:5173\`, explore offline or enter \`ws://localhost:3001/ws\` in the multiplayer URL field and tap **CONNECT**.
+5. Open `http://localhost:5173`, explore offline or enter `ws://localhost:3001/ws` in the multiplayer URL field and tap **CONNECT**.
 
-**Assets:** The CI builds the actual GLBs before building the web client. A fresh local checkout has **no committed \`apps/client/public/assets/*.glb\` files**; without running Blender generation, the web app should use its procedural visual fallbacks. Follow the [Blender asset pipeline](#blender-asset-pipeline) section if you want locally generated rigged models.
+**Assets:** The CI builds the actual GLBs before building the web client. A fresh local checkout has **no committed `apps/client/public/assets/*.glb` files**; without running Blender generation, the web app should use its procedural visual fallbacks. Follow the [Blender asset pipeline](#blender-asset-pipeline) section if you want locally generated rigged models.
 
 ### LAN play on Android
 
-The host PC and the phone need network access to each other (same LAN or permitted routed network). Start Bun on your computer and determine the computer's **LAN IP**, e.g. with \`hostname -I\` on Ubuntu. In the APK enter:
+The host PC and the phone need network access to each other (same LAN or permitted routed network). Start Bun on your computer and determine the computer's **LAN IP**, e.g. with `hostname -I` on Ubuntu. In the APK enter:
 
-\`\`\`text
+```text
 ws://192.168.1.50:3001/ws
-\`\`\`
+```
 
-**Replace \`192.168.1.50\` with your computer's actual IP.** Do not use \`localhost\` on a phone to reach a different computer. Ensure the firewall allows TCP 3001 and avoid guest Wi-Fi/client-isolation networks. Android **debug** manifests permit cleartext networking; production needs a secure \`wss://\` endpoint.
+**Replace `192.168.1.50` with your computer's actual IP.** Do not use `localhost` on a phone to reach a different computer. Ensure the firewall allows TCP 3001 and avoid guest Wi-Fi/client-isolation networks. Android **debug** manifests permit cleartext networking; production needs a secure `wss://` endpoint.
 
 ## Building Android APKs
 
 ### Preferred — GitHub Actions
 
 1. Open **[Android Debug APK](https://github.com/mtdewwolf/realms-unwritten/actions/workflows/android-debug-apk.yml)**.
-2. Select **Run workflow** on branch \`Master\`, or push a commit to \`Master\`.
+2. Select **Run workflow** on branch `Master`, or push a commit to `Master`.
 3. Verify each step is green: checkout, Bun install, typecheck/tests, Blender dependencies, GLB generation/validation, live WebSocket smoke test, Vite build, Capacitor sync, Gradle APK compile and artifact upload.
-4. Download artifact **\`realms-unwritten-debug-apk\`** from the completed workflow run (GitHub may require signing in).
-5. Extract the artifact and install \`app-debug.apk\` onto a test device.
+4. Download artifact **`realms-unwritten-debug-apk`** from the completed workflow run (GitHub may require signing in).
+5. Extract the artifact and install `app-debug.apk` onto a test device.
 6. Check boot, touch controls, landscape/portrait layouts, offline mode and LAN multiplayer manually.
 
-CI **already passed** at [run #43148146024](https://github.com/mtdewwolf/realms-unwritten/actions/runs/43148146024), for source commit \`0c24d4e\`. Later commits should be checked independently.
+CI **already passed** at [run #43148146024](https://github.com/mtdewwolf/realms-unwritten/actions/runs/43148146024), for source commit `0c24d4e`. Later commits should be checked independently.
 
 **Artifact retention:** Android debug APK ~14 days; dedicated character GLBs ~30 days. Artifacts are not automatically published as releases or installed on devices.
 
 ### Local Android build (Ubuntu / suitable Windows environment)
 
-Install **JDK 21**, a working Android SDK, Bun and Blender with NumPy available to Blender's exporter. Ensure \`ANDROID_HOME\` points to the SDK.
+Install **JDK 21**, a working Android SDK, Bun and Blender with NumPy available to Blender's exporter. Ensure `ANDROID_HOME` points to the SDK.
 
-\`\`\`bash
+```bash
 bun install
 bun run check
 bun test
@@ -381,36 +381,36 @@ bunx cap sync android
 cd android
 chmod +x gradlew
 ./gradlew --no-daemon assembleDebug
-\`\`\`
+```
 
-Expected APK: \`apps/client/android/app/build/outputs/apk/debug/app-debug.apk\`.
+Expected APK: `apps/client/android/app/build/outputs/apk/debug/app-debug.apk`.
 
-The repository does not commit the generated \`apps/client/android/\` native project; regenerate it on clean checkouts. For LAN testing, the CI adds \`android:usesCleartextTraffic="true"\` **only for debug builds**. If compiling locally from scratch, replicate that debug manifest as described in [the workflow](.github/workflows/android-debug-apk.yml), or use \`wss://\`. Do **not** enable arbitrary cleartext traffic in production.
+The repository does not commit the generated `apps/client/android/` native project; regenerate it on clean checkouts. For LAN testing, the CI adds `android:usesCleartextTraffic="true"` **only for debug builds**. If compiling locally from scratch, replicate that debug manifest as described in [the workflow](.github/workflows/android-debug-apk.yml), or use `wss://`. Do **not** enable arbitrary cleartext traffic in production.
 
 Optional install with ADB:
 
-\`\`\`bash
+```bash
 adb devices
 adb install -r apps/client/android/app/build/outputs/apk/debug/app-debug.apk
-\`\`\`
+```
 
 ## Blender asset pipeline
 
 **Dedicated workflow:** [Build Blender Character Assets](https://github.com/mtdewwolf/realms-unwritten/actions/workflows/blender-assets.yml).
 
-It installs Blender + NumPy, runs the original Python generator, validates GLB v2 structure/rig/clip names, produces SHA-256 sums, and uploads the **\`realms-unwritten-character-glbs\`** artifact containing \`adventurer.glb\`, \`wolf.glb\`, and \`SHA256SUMS\`.
+It installs Blender + NumPy, runs the original Python generator, validates GLB v2 structure/rig/clip names, produces SHA-256 sums, and uploads the **`realms-unwritten-character-glbs`** artifact containing `adventurer.glb`, `wolf.glb`, and `SHA256SUMS`.
 
 Local regeneration:
 
-\`\`\`bash
+```bash
 mkdir -p build/assets
 blender --background --factory-startup --python-exit-code 1 \
   --python tools/blender/generate_characters.py -- --out build/assets
 python3 tools/blender/validate_glb.py build/assets
 sha256sum build/assets/*.glb
-\`\`\`
+```
 
-The Android workflow independently generates the GLBs under the client's \`public/assets/\` folder before Vite bundles them. Generated assets are reproducible **blockouts**, not a polished production art library.
+The Android workflow independently generates the GLBs under the client's `public/assets/` folder before Vite bundles them. Generated assets are reproducible **blockouts**, not a polished production art library.
 
 ## All automated and manual testing steps
 
@@ -418,82 +418,82 @@ Run tests from the **repository root**, unless a subsection explicitly changes d
 
 ### A. Fast developer gate (every change)
 
-\`\`\`bash
+```bash
 bun install
 bun run check
 bun test
 bun run build
-\`\`\`
+```
 
-**Expected:** No TypeScript errors; all Bun tests pass; Vite produces \`apps/client/dist/\`. \`bun run build\` can still use procedural visual fallbacks if local GLBs have not been generated, so additionally run the asset pipeline when testing rigged models.
+**Expected:** No TypeScript errors; all Bun tests pass; Vite produces `apps/client/dist/`. `bun run build` can still use procedural visual fallbacks if local GLBs have not been generated, so additionally run the asset pipeline when testing rigged models.
 
 Existing Bun test files cover:
 
 | Test file | What it checks |
 | --- | --- |
-| \`test/bootstrap.test.ts\` | Project/bootstrap invariants |
-| \`test/assets.test.ts\` | Asset catalog/limits |
-| \`test/glb-wiring.test.ts\` | GLB URL wiring |
-| \`test/touch-camera.test.ts\` | Pinch and camera input math |
-| \`test/combat-demo.test.ts\` | Local attack/stamina math |
-| \`test/chunked-world.test.ts\` | Chunk indexing, bounds and deterministic placement |
-| \`test/terrain.test.ts\` | World seam heights, collision sampler and grid sizes |
-| \`test/world-landmarks.test.ts\` | Landmark stability and chunk ownership |
-| \`test/settlements.test.ts\` | Settlement locations, ownership and road-grid spacing |
-| \`test/world-map.test.ts\` | Map projection, fog-cell addressing and compass guidance |
-| \`test/server-simulation.test.ts\` | Authoritative movement, sequence rejection, bounds and proximity |
+| `test/bootstrap.test.ts` | Project/bootstrap invariants |
+| `test/assets.test.ts` | Asset catalog/limits |
+| `test/glb-wiring.test.ts` | GLB URL wiring |
+| `test/touch-camera.test.ts` | Pinch and camera input math |
+| `test/combat-demo.test.ts` | Local attack/stamina math |
+| `test/chunked-world.test.ts` | Chunk indexing, bounds and deterministic placement |
+| `test/terrain.test.ts` | World seam heights, collision sampler and grid sizes |
+| `test/world-landmarks.test.ts` | Landmark stability and chunk ownership |
+| `test/settlements.test.ts` | Settlement locations, ownership and road-grid spacing |
+| `test/world-map.test.ts` | Map projection, fog-cell addressing and compass guidance |
+| `test/server-simulation.test.ts` | Authoritative movement, sequence rejection, bounds and proximity |
 
 Focused runs:
 
-\`\`\`bash
+```bash
 bun test test/server-simulation.test.ts
 bun test test/chunked-world.test.ts test/terrain.test.ts
 bun test test/world-landmarks.test.ts test/settlements.test.ts test/world-map.test.ts
 bun test test/combat-demo.test.ts test/touch-camera.test.ts
-\`\`\`
+```
 
 ### B. Live server integration smoke test
 
-\`\`\`bash
+```bash
 bun tools/smoke-server.ts
-\`\`\`
+```
 
-**Expected:** Output similar to \`PASS multiplayer smoke: 2 guests, authoritative position and nearby snapshots\` and exit code 0. This test starts a temporary Bun server with an isolated SQLite file, waits for \`/health\`, connects **two distinct guests**, sends movement input, validates that the second guest receives the moved player, shuts down the process and removes temporary data. It does **not** currently certify reconnection across server restarts, authentication security, actual phone sockets, or hundreds of concurrent players.
+**Expected:** Output similar to `PASS multiplayer smoke: 2 guests, authoritative position and nearby snapshots` and exit code 0. This test starts a temporary Bun server with an isolated SQLite file, waits for `/health`, connects **two distinct guests**, sends movement input, validates that the second guest receives the moved player, shuts down the process and removes temporary data. It does **not** currently certify reconnection across server restarts, authentication security, actual phone sockets, or hundreds of concurrent players.
 
-Run this in addition to \`bun test\`; it is not a normal \`test/*.test.ts\` unit test.
+Run this in addition to `bun test`; it is not a normal `test/*.test.ts` unit test.
 
 ### C. Server health and direct connection
 
 1. Start the server:
 
-   \`\`\`bash
+   ```bash
    bun run dev:server
-   \`\`\`
+   ```
 
 2. Query health:
 
-   \`\`\`bash
+   ```bash
    curl -fsS http://127.0.0.1:3001/health
-   \`\`\`
+   ```
 
-3. Verify response has \`"ok":true\`, protocol version \`1\`, and the online player count.
-4. Open the client and connect to \`ws://127.0.0.1:3001/ws\` (when client and server are on the same machine).
+3. Verify response has `"ok":true`, protocol version `1`, and the online player count.
+4. Open the client and connect to `ws://127.0.0.1:3001/ws` (when client and server are on the same machine).
 5. Confirm the connection-status message switches to online. Disconnect and verify offline exploration continues.
 6. In the terminal, check for runtime exceptions and ensure the server remains running.
 
 For isolated testing without touching existing character data:
 
-\`\`\`bash
+```bash
 HOST=127.0.0.1 PORT=3001 WORLD_DB_PATH=/tmp/realms-unwritten-qa.sqlite \
   bun apps/server/src/index.ts
-\`\`\`
+```
 
 ### D. Two-player LAN multiplayer manual test
 
 **Important:** Use two distinct guest identities—e.g., a phone and a separate browser profile. Two normal tabs in the *same* browser profile share a guest token and the server rejects duplicate sessions by design.
 
 1. Start Bun on a host accessible over the LAN, confirm TCP port 3001 is open.
-2. Connect Device A and Device B to \`ws://<HOST_LAN_IP>:3001/ws\`.
+2. Connect Device A and Device B to `ws://<HOST_LAN_IP>:3001/ws`.
 3. Both should join without errors and show a character near the starter area.
 4. Move A using its joystick/WASD; B should see A move.
 5. Move B; A should see B move. Check remote facing and stop behavior.
@@ -502,7 +502,7 @@ HOST=127.0.0.1 PORT=3001 WORLD_DB_PATH=/tmp/realms-unwritten-qa.sqlite \
 8. Restart Bun gracefully and reconnect each client; saved x/z positions should be restored.
 9. Walk beyond the **160-meter** nearby-player radius; distant players should disappear from each other's local rendering. Return and verify they reappear.
 10. Switch off the server or network: gameplay should remain explorable offline and remote avatars should disappear.
-11. Test from Android on both Wi-Fi and a routed network only when the server is reachable; do not use \`localhost\` on the phone to access a different machine.
+11. Test from Android on both Wi-Fi and a routed network only when the server is reachable; do not use `localhost` on the phone to access a different machine.
 12. Confirm no repeated console errors, runaway memory or stuck movement after reconnect.
 
 **Expected limitations:** remote players use procedural representations, not full rigged GLBs. Combat and map discoveries are not shared. Rejoining a wiped/new server database with an existing guest token currently returns an invalid-credential error; preserving the database is required for identity continuity.
@@ -569,19 +569,19 @@ On an Android device or touchscreen browser:
 
 1. Generate both GLBs with Blender and run the validation script:
 
-   \`\`\`bash
+   ```bash
    blender --background --factory-startup --python-exit-code 1 \
      --python tools/blender/generate_characters.py -- --out build/assets
    python3 tools/blender/validate_glb.py build/assets
-   \`\`\`
+   ```
 
 2. Confirm both assets are nonempty GLB version 2, contain meshes/skins, and have required named clips.
-3. Confirm \`adventurer.glb\` and \`wolf.glb\` load in the client and are correctly positioned relative to the ground.
+3. Confirm `adventurer.glb` and `wolf.glb` load in the client and are correctly positioned relative to the ground.
 4. Test idle, walking, sword attack, dodge, wolf movement, wolf attack and death transitions.
 5. Verify the procedural fallback remains visible when GLBs are **deliberately absent** or invalid.
 6. Inspect skeleton pivot artifacts, clipping, incorrect facing and animation loops.
 7. On Android, check frame-time and GPU skinning costs rather than assuming small files guarantee good runtime performance.
-8. When downloaded from Actions, verify the SHA-256 sums: \`sha256sum -c SHA256SUMS\` from the extracted artifact directory.
+8. When downloaded from Actions, verify the SHA-256 sums: `sha256sum -c SHA256SUMS` from the extracted artifact directory.
 
 ### J. Persistence and failure recovery
 
@@ -610,28 +610,28 @@ Test on at least one actual Android phone:
 | Reconnect | Persistent guest position survives graceful server restart |
 | Performance | Record frame rate (target **30 FPS**), dropped frames, RAM and temperature over 10–15 min |
 | Lifecycle | Background/resume, rotation, screen lock/unlock, Wi-Fi disconnect |
-| Crash diagnostics | Save \`adb logcat\` output and server logs when a failure occurs |
+| Crash diagnostics | Save `adb logcat` output and server logs when a failure occurs |
 
 Useful Android commands:
 
-\`\`\`bash
+```bash
 adb devices
 adb install -r apps/client/android/app/build/outputs/apk/debug/app-debug.apk
 adb logcat -c
 adb logcat > android-session.log
 # Stop capture with Ctrl+C and attach the log to your issue report.
-\`\`\`
+```
 
 **30 FPS is a project target, not a verified benchmark.** Actual battery, CPU/GPU memory and thermal behavior must be measured on hardware.
 
 ### L. Regression gate before merging/releasing
 
-- [ ] \`bun run check\` passes for **both** client and server.
-- [ ] \`bun test\` passes.
-- [ ] \`bun tools/smoke-server.ts\` passes.
+- [ ] `bun run check` passes for **both** client and server.
+- [ ] `bun test` passes.
+- [ ] `bun tools/smoke-server.ts` passes.
 - [ ] Blender generator and GLB validator pass.
-- [ ] \`bun run build\` completes.
-- [ ] Android Gradle \`assembleDebug\` succeeds and artifact exists.
+- [ ] `bun run build` completes.
+- [ ] Android Gradle `assembleDebug` succeeds and artifact exists.
 - [ ] Offline exploration still works.
 - [ ] Two distinct guest clients can connect and see movement.
 - [ ] Position persistence survives a graceful restart.
@@ -641,7 +641,7 @@ adb logcat > android-session.log
 
 Suggested bug report:
 
-\`\`\`text
+```text
 Commit / branch:
 APK Actions run / artifact:
 Device + Android version (or browser):
@@ -652,7 +652,7 @@ Expected:
 Observed:
 Logcat / Bun log:
 Frequency:
-\`\`\`
+```
 
 ## Known limitations, security, and troubleshooting
 
@@ -673,11 +673,11 @@ Frequency:
 
 | Symptom | Likely cause / next check |
 | --- | --- |
-| APK Actions fails at type checking | Read the failing \`bun run check\` diagnostic; fix TS before retrying |
-| Blender export missing GLB | Install \`blender\` and \`python3-numpy\`; run \`--python-exit-code 1\`; validate outputs |
-| Web app shows simple procedural character | GLB file not generated / wrong \`/assets/*.glb\` path; fallback is intentional |
+| APK Actions fails at type checking | Read the failing `bun run check` diagnostic; fix TS before retrying |
+| Blender export missing GLB | Install `blender` and `python3-numpy`; run `--python-exit-code 1`; validate outputs |
+| Web app shows simple procedural character | GLB file not generated / wrong `/assets/*.glb` path; fallback is intentional |
 | Android cannot connect to Bun | Wrong LAN IP, host firewall, guest Wi-Fi isolation, server not started, or cleartext policy |
-| Browser cannot connect to WSS | Secure page usually requires \`wss://\`; configure valid TLS/proxy |
+| Browser cannot connect to WSS | Secure page usually requires `wss://`; configure valid TLS/proxy |
 | "Character already connected" | Same guest token in two browser tabs/profiles; use distinct identity stores |
 | "Unknown guest token" | Connecting to a different/reset server DB; guest token cannot be recovered there |
 | Client moves offline but no second player appears | Verify both clients connected; use separate guest profiles and remain within 160 m |
