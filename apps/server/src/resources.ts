@@ -6,7 +6,7 @@ import {closeToGuard} from "./quests";
 export const ORE_RANGE=5;
 export const ORE_RESPAWN_MS=30_000;
 export const RECIPE_ID="ironblade";
-export interface ResourceResult{type:"resource_result";action:"gather"|"craft";ok:boolean;reason?:string;nodeId?:string;item?:string;amount?:number}
+export interface ResourceResult{type:"resource_result";action:"gather"|"craft";ok:boolean;reason?:string;nodeId?:string;item?:string;amount?:number;retryAfterMs?:number}
 export interface NearbyOre{id:string;x:number;z:number;distance:number}
 export function nearestOre(x:number,z:number):NearbyOre|null{
   const nodes=landmarksNear(x,z,ORE_RANGE).filter(p=>p.type==="ore")
@@ -23,10 +23,10 @@ export class ResourceService{
     const cooldown=db.query("INSERT INTO ore_nodes(node_id,available_after) VALUES (?,?) ON CONFLICT(node_id) DO UPDATE SET available_after=excluded.available_after");
     this.harvest=db.transaction((id:string,ore:NearbyOre,now:number):ResourceResult=>{
       const ready=node.get(ore.id);
-      if(ready&&ready.available_after>now)return {type:"resource_result",action:"gather",ok:false,reason:"Ore depleted; return after it replenishes"};
+      if(ready&&ready.available_after>now)return {type:"resource_result",action:"gather",ok:false,reason:"Ore depleted; return after it replenishes",nodeId:ore.id,retryAfterMs:ready.available_after-now};
       cooldown.run(ore.id,now+ORE_RESPAWN_MS);
       this.bag.creditOre(id,1);
-      return {type:"resource_result",action:"gather",ok:true,nodeId:ore.id,item:"Iron Ore",amount:1};
+      return {type:"resource_result",action:"gather",ok:true,nodeId:ore.id,item:"Iron Ore",amount:1,retryAfterMs:ORE_RESPAWN_MS};
     });
   }
   gather(id:string,x:number,z:number,alive:boolean,now=Date.now()):ResourceResult{

@@ -39,6 +39,10 @@ export class InventoryPanel{
     }
     const craftButton=this.element.querySelector<HTMLButtonElement>("#bag-craft")!;
     craftButton.disabled=!state.items.some(i=>i.id==="iron-ore"&&i.quantity>=2)||!state.items.some(i=>i.id==="wolf-fang"&&i.quantity>=1);
+    const missingOre=Math.max(0,2-(state.items.find(i=>i.id==="iron-ore")?.quantity??0));
+    const missingFang=Math.max(0,1-(state.items.find(i=>i.id==="wolf-fang")?.quantity??0));
+    const note=this.element.querySelector<HTMLElement>(".bag-note")!;
+    note.textContent=missingOre||missingFang?"Ironblade requires "+(missingOre?missingOre+" more Iron Ore":"no more Ore")+" and "+(missingFang?missingFang+" Wolf Fang":"no more Fangs")+". Return to the Verdant Reach workshop to craft.":"Materials ready! Return to Verdant Reach workshop (beside the guard) and craft Ironblade.";
     if(!state.items.length){this.items.textContent="Your bag is empty.";return;}
     for(const item of state.items){
       const row=document.createElement("div");row.className="bag-item";

@@ -9,6 +9,7 @@ import { MultiplayerClient, type ServerWolf, type ServerVitals, type CombatActio
 import { InventoryPanel } from "./ui/inventory";
 import { QuestPanel } from "./ui/quests";
 import { CharacterPanel } from "./ui/character";
+import { ResourceGuide } from "./ui/resourceGuide";
 import { settlementsNear, discoverySettlements } from "./world/settlements";
 import { createAdventurer, createWolf } from "./characters/rig";
 import { mountAnimatedAsset, type AnimatedAsset, type AnimationState } from "./characters/animatedAsset";
@@ -119,6 +120,8 @@ const status = document.querySelector<HTMLElement>("#status")!;
 const coordinates = document.querySelector<HTMLElement>("#world-coordinates")!;
 const exploration = document.querySelector<HTMLElement>("#exploration")!;
 const atlas = new WorldMap(app);
+const resourceGuide=new ResourceGuide(app,scene,(x,z)=>atlas.setWaypoint({x,z}));
+let lastResourceUpdate=0;
 const inventoryPanel=new InventoryPanel(app,item=>multiplayer.sendEquip(item),()=>multiplayer.sendCraft());
 const questPanel=new QuestPanel(app,scene,action=>multiplayer.sendQuest(action));
 const characterPanel=new CharacterPanel(app,()=>multiplayer.requestProgression());
@@ -161,7 +164,8 @@ const multiplayer = new MultiplayerClient(scene, avatar,
   reward=>{battleInfo.textContent="Loot earned: "+reward.items.map(item=>item.name).join(", ")+" +"+reward.coins+" coins";},
   quest=>questPanel.update(quest),
   result=>{questPanel.result(result);if(result.ok&&result.action==="turnin")status.textContent="Wolf Hunt complete · +25 coins";},
-  state=>{const newLevel=characterPanel.update(state);if(newLevel!==null)status.textContent="Level up! You reached level "+newLevel;}
+  state=>{const newLevel=characterPanel.update(state);if(newLevel!==null)status.textContent="Level up! You reached level "+newLevel;},
+  result=>{if(result.action==="gather"&&result.nodeId&&result.retryAfterMs)resourceGuide.markCooldown(result.nodeId,result.retryAfterMs);}
 );
 const multiplayerPanel=document.createElement("div");
 multiplayerPanel.id="multiplayer-panel";
@@ -285,7 +289,11 @@ function dodge() {
 }
 document.querySelector("#attack")!.addEventListener("click", attack);
 document.querySelector("#gather")!.addEventListener("click", () => {
-  if(multiplayer.connected){multiplayer.sendGather();return;}
+  if(multiplayer.connected){
+    const target=resourceGuide.currentTarget();
+    if(target&&!target.inRange){status.textContent="Move "+Math.round(target.distance)+"m toward ore or tap TRACK ORE";return;}
+    multiplayer.sendGather();return;
+  }
   status.textContent="Connect to the Bun server to mine Ironstone Outcrops.";
 });
 const dodgeButton = document.createElement("button");
@@ -369,6 +377,7 @@ function frame(now: number) {
   }
   avatar.position.y=groundHeightAt(avatar.position.x,avatar.position.z);
   atlas.update(avatar.position.x,avatar.position.z,now);
+  if(now-lastResourceUpdate>=500){resourceGuide.update(avatar.position.x,avatar.position.z,multiplayer.connected,now);lastResourceUpdate=now;}
   world.update(avatar.position.x,avatar.position.z);
   const label=biomeAt(avatar.position.x,avatar.position.z).toUpperCase()+" | CHUNK "+chunkCoordinate(avatar.position.x)+","+chunkCoordinate(avatar.position.z)+" | X "+Math.round(avatar.position.x)+" Z "+Math.round(avatar.position.z)+" | "+world.loadedChunks+" loaded";
   if(coordinates.textContent!==label) coordinates.textContent=label;

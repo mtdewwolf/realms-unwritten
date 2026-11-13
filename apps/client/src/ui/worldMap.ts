@@ -97,6 +97,13 @@ export class WorldMap {
     this.dirty=true;
     if(next)this.render();
   }
+  setWaypoint(destination:MapPoint):void{
+    if(!Number.isFinite(destination.x)||!Number.isFinite(destination.z))return;
+    this.waypoint={x:cap(destination.x),z:cap(destination.z)};
+    this.dirty=true;
+    this.guidance.textContent="◆ Resource waypoint set";
+    if(this.visible)this.render();
+  }
   recordSettlement(town:Settlement):void{
     this.knownTowns.set(town.id,town);this.dirty=true;
   }

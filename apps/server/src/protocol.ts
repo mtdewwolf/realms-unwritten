@@ -23,7 +23,7 @@ export interface RewardMessage{type:"reward";eventId:string;items:InventoryItem[
 export interface QuestStatusMessage{type:"quest_status";id:"verdant-wolf-hunt";title:string;stage:"available"|"active"|"ready"|"completed";kills:number;required:number;rewardCoins:number}
 export interface QuestResultMessage{type:"quest_result";action:"status"|"accept"|"turnin";ok:boolean;reason?:string}
 export interface ProgressionMessage{type:"progression";xp:number;level:number;nextLevelXp:number|null;attributes:{strength:number;vitality:number;agility:number}}
-export interface ResourceResultMessage{type:"resource_result";action:"gather"|"craft";ok:boolean;reason?:string;nodeId?:string;item?:string;amount?:number}
+export interface ResourceResultMessage{type:"resource_result";action:"gather"|"craft";ok:boolean;reason?:string;nodeId?:string;item?:string;amount?:number;retryAfterMs?:number}
 export type ServerMessage=WelcomeMessage|SnapshotMessage|CombatActionResult|InventoryMessage|RewardMessage|QuestStatusMessage|QuestResultMessage|ProgressionMessage|EquipResult|ResourceResultMessage|{type:"error";message:string};
 export function validateInput(input:unknown):InputMessage|null{
   if(!input||typeof input!=="object")return null;

@@ -71,3 +71,11 @@
 
 #bag-craft{width:100%;margin-top:12px;padding:11px;border:1px solid #bdac75;border-radius:9px;background:#495d37;color:#fff7d9;font-weight:700;touch-action:manipulation}
 #bag-craft:disabled{opacity:.45}
+
+#resource-guide{position:absolute;right:max(10px,env(safe-area-inset-right));top:96px;width:min(210px,30vw);z-index:11;background:#142c2be9;color:#eaf8f5;border:1px solid #699e9a;border-radius:11px;padding:10px;font-size:11px;pointer-events:auto;box-shadow:0 5px 22px #0005}
+#resource-guide strong{color:#b4ecf1;font-size:12px}
+#resource-guide p{margin:6px 0;line-height:1.4}
+#resource-track{border:1px solid #80c4c0;background:#245c58;color:#fff;border-radius:7px;padding:8px 10px;font-size:11px;width:100%;touch-action:manipulation}
+#resource-track:disabled{opacity:.45}
+#resource-workshop{color:#e6c88d}
+@media(max-width:700px){#resource-guide{right:7px;top:88px;width:min(154px,31vw);padding:7px;font-size:10px}#resource-track{font-size:10px;padding:7px 5px}}

@@ -10,7 +10,7 @@ export interface ServerWolf{id:string;x:number;z:number;heading:number;health:nu
 export interface ServerVitals{health:number;stamina:number;maxHealth:number;maxStamina:number;alive:boolean}
 interface Snapshot{type:"snapshot";tick:number;you:PlayerState;others:PlayerState[];ack:number;vitals:ServerVitals;wolf:ServerWolf|null}
 export interface CombatActionResult{type:"action_result";seq:number;action:"attack"|"dodge";ok:boolean;reason?:string;wolfHealth:number;health:number;stamina:number}
-type ServerMessage={type:"resource_result";action:"gather"|"craft";ok:boolean;reason?:string;item?:string;amount?:number}|{type:"equip_result";ok:boolean;reason?:string}|{type:"welcome";protocol:number;id:string;token:string;player:PlayerState}|Snapshot|CombatActionResult|InventoryState|RewardEvent|QuestState|QuestResult|ProgressionState|{type:"error";message:string};
+type ServerMessage={type:"resource_result";action:"gather"|"craft";ok:boolean;reason?:string;item?:string;amount?:number;nodeId?:string;retryAfterMs?:number}|{type:"equip_result";ok:boolean;reason?:string}|{type:"welcome";protocol:number;id:string;token:string;player:PlayerState}|Snapshot|CombatActionResult|InventoryState|RewardEvent|QuestState|QuestResult|ProgressionState|{type:"error";message:string};
 export interface MovementInput{dx:number;dz:number}
 const TOKEN_KEY="realms-unwritten-guest-token-v1";
 function storedToken():string|null{try{return localStorage.getItem(TOKEN_KEY);}catch{return null;}}
@@ -23,7 +23,7 @@ export class MultiplayerClient {
   private readonly others=new Map<string,{mesh:THREE.Group;target:PlayerState}>();
   private lastSend=0;
   private online=false;
-  constructor(private readonly scene:THREE.Scene,private readonly avatar:THREE.Group,private readonly status:(s:string)=>void,private readonly onCombat:(vitals:ServerVitals,wolf:ServerWolf|null)=>void,private readonly onActionResult:(result:CombatActionResult)=>void,private readonly onOffline:()=>void,private readonly onInventory:(state:InventoryState)=>void,private readonly onReward:(event:RewardEvent)=>void,private readonly onQuest:(quest:QuestState)=>void,private readonly onQuestResult:(result:QuestResult)=>void,private readonly onProgression:(state:ProgressionState)=>void){}
+  constructor(private readonly scene:THREE.Scene,private readonly avatar:THREE.Group,private readonly status:(s:string)=>void,private readonly onCombat:(vitals:ServerVitals,wolf:ServerWolf|null)=>void,private readonly onActionResult:(result:CombatActionResult)=>void,private readonly onOffline:()=>void,private readonly onInventory:(state:InventoryState)=>void,private readonly onReward:(event:RewardEvent)=>void,private readonly onQuest:(quest:QuestState)=>void,private readonly onQuestResult:(result:QuestResult)=>void,private readonly onProgression:(state:ProgressionState)=>void,private readonly onResource:(result:{type:"resource_result";action:"gather"|"craft";ok:boolean;nodeId?:string;retryAfterMs?:number})=>void){}
   get connected():boolean{return this.online&&this.socket?.readyState===WebSocket.OPEN;}
   connect(url:string):void{
     this.disconnect();
@@ -46,7 +46,7 @@ export class MultiplayerClient {
       if(message.type==="progression"){this.onProgression(message);return;}
       if(message.type==="quest_status"){this.onQuest(message);return;}
       if(message.type==="quest_result"){this.onQuestResult(message);return;}
-      if(message.type==="resource_result"){this.status(message.ok?(message.action==="gather"?"Gathered ":"Crafted ")+(message.item??"item"):"Resource action rejected: "+(message.reason??"Unavailable"));return;}
+      if(message.type==="resource_result"){this.onResource(message);this.status(message.ok?(message.action==="gather"?"Gathered ":"Crafted ")+(message.item??"item"):"Resource action rejected: "+(message.reason??"Unavailable"));return;}
       if(message.type==="equip_result"){this.status(message.ok?"Weapon equipped":message.reason??"Equipment change rejected");return;}
       if(message.type==="inventory"){this.onInventory(message);return;}
       if(message.type==="reward"){this.onReward(message);return;}
