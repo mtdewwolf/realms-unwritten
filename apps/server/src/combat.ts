@@ -56,6 +56,16 @@ export class CombatSimulation {
     this.contributors.delete(id);
     if(this.wolf.targetId===id){this.wolf.targetId=null;this.wolf.phase="idle";}
   }
+  canHeal(id:string):boolean{
+    const p=this.players.get(id);
+    return !!p&&p.alive&&p.health>0&&p.health<MAX_HEALTH;
+  }
+  heal(id:string,amount:number):VitalView|null{
+    if(!this.canHeal(id)||!Number.isFinite(amount)||amount<=0)return null;
+    const p=this.players.get(id)!;
+    p.health=Math.min(MAX_HEALTH,p.health+amount);
+    return this.vital(id);
+  }
   vital(id:string):VitalView|null{
     const p=this.players.get(id);
     return p?{health:p.health,stamina:p.stamina,maxHealth:p.maxHealth,maxStamina:p.maxStamina,alive:p.alive}:null;

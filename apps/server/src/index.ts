@@ -127,6 +127,20 @@ const server=Bun.serve<Session>({
         }
         return;
       }
+      if((packet as {type?:unknown})?.type==="use"){
+        const id=ws.data.playerId;
+        const item=(packet as {item?:unknown}).item;
+        if(item!=="healing-tonic"||!combat.canHeal(id)){
+          send(ws,{type:"use_result",ok:false,reason:item!=="healing-tonic"?"Unknown consumable":"Healing requires a living, injured character"});
+          return;
+        }
+        // No client health or healing amount is accepted.
+        if(!inventory.consumeTonic(id)){send(ws,{type:"use_result",ok:false,reason:"No Healing Tonic available"});return;}
+        const vitals=combat.heal(id,30);
+        send(ws,{type:"use_result",ok:true,item:"Healing Tonic",health:vitals!.health});
+        send(ws,inventory.read(id));
+        return;
+      }
       if((packet as {type?:unknown})?.type==="gather"||(packet as {type?:unknown})?.type==="craft"){
         const id=ws.data.playerId;
         const actor=world.players.get(id);
