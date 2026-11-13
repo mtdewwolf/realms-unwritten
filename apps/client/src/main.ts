@@ -10,6 +10,7 @@ import { InventoryPanel } from "./ui/inventory";
 import { QuestPanel } from "./ui/quests";
 import { CharacterPanel } from "./ui/character";
 import { ResourceGuide } from "./ui/resourceGuide";
+import { GameMenu } from "./ui/gameMenu";
 import { settlementsNear, discoverySettlements } from "./world/settlements";
 import { createAdventurer, createWolf } from "./characters/rig";
 import { mountAnimatedAsset, type AnimatedAsset, type AnimationState } from "./characters/animatedAsset";
@@ -174,6 +175,17 @@ app.appendChild(multiplayerPanel);
 const serverUrlInput=multiplayerPanel.querySelector<HTMLInputElement>("#server-url")!;
 multiplayerPanel.querySelector("#server-connect")!.addEventListener("click",()=>multiplayer.connect(serverUrlInput.value.trim()));
 multiplayerPanel.querySelector("#server-disconnect")!.addEventListener("click",()=>{multiplayer.disconnect();status.textContent="Offline · local exploration";});
+const gameMenu=new GameMenu(app);
+const controlledPanels=[
+  {tab:"map" as const,open:()=>atlas.open(),close:()=>atlas.close()},
+  {tab:"bag" as const,open:()=>{inventoryPanel.element.hidden=false;multiplayer.requestInventory();},close:()=>{inventoryPanel.element.hidden=true;}},
+  {tab:"quest" as const,open:()=>{questPanel.element.hidden=false;multiplayer.sendQuest("status");},close:()=>{questPanel.element.hidden=true;}},
+  {tab:"hero" as const,open:()=>{characterPanel.panel.hidden=false;multiplayer.requestProgression();},close:()=>{characterPanel.panel.hidden=true;}},
+  {tab:"network" as const,open:()=>{multiplayerPanel.hidden=false;serverUrlInput.focus();},close:()=>{multiplayerPanel.hidden=true;serverUrlInput.blur();}}
+];
+for(const panel of controlledPanels)gameMenu.register(panel.tab,panel);
+multiplayerPanel.hidden=true;
+app.classList.add("game-menu-enabled");
 const isLocalHost=["localhost","127.0.0.1"].includes(location.hostname);
 if(isLocalHost)serverUrlInput.value="ws://"+location.hostname+":3001/ws";
 
@@ -377,7 +389,14 @@ function frame(now: number) {
   }
   avatar.position.y=groundHeightAt(avatar.position.x,avatar.position.z);
   atlas.update(avatar.position.x,avatar.position.z,now);
-  if(now-lastResourceUpdate>=500){resourceGuide.update(avatar.position.x,avatar.position.z,multiplayer.connected,now);lastResourceUpdate=now;}
+  if(now-lastResourceUpdate>=500){
+    resourceGuide.update(avatar.position.x,avatar.position.z,multiplayer.connected,now);
+    const nearOre=resourceGuide.currentTarget()?.inRange===true;
+    const gatherButton=document.querySelector<HTMLButtonElement>("#gather")!;
+    gatherButton.querySelector("span")!.textContent=nearOre?"MINE":"GATHER";
+    gatherButton.classList.toggle("action-context-ready",nearOre&&multiplayer.connected);
+    lastResourceUpdate=now;
+  }
   world.update(avatar.position.x,avatar.position.z);
   const label=biomeAt(avatar.position.x,avatar.position.z).toUpperCase()+" | CHUNK "+chunkCoordinate(avatar.position.x)+","+chunkCoordinate(avatar.position.z)+" | X "+Math.round(avatar.position.x)+" Z "+Math.round(avatar.position.z)+" | "+world.loadedChunks+" loaded";
   if(coordinates.textContent!==label) coordinates.textContent=label;

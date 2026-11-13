@@ -79,3 +79,55 @@
 #resource-track:disabled{opacity:.45}
 #resource-workshop{color:#e6c88d}
 @media(max-width:700px){#resource-guide{right:7px;top:88px;width:min(154px,31vw);padding:7px;font-size:10px}#resource-track{font-size:10px;padding:7px 5px}}
+
+
+/* One responsive navigation surface; gameplay controls stay in their own thumb zones. */
+#game-menu-button{position:absolute;top:max(12px,env(safe-area-inset-top));left:max(12px,env(safe-area-inset-left));min-height:44px;padding:9px 13px;border:1px solid #a9c6b5;background:#1b3e39f5;color:#f3f7ed;border-radius:11px;font-size:12px;font-weight:800;letter-spacing:.06em;z-index:65;touch-action:manipulation}
+#game-menu-backdrop{position:absolute;inset:0;background:#07110fc9;z-index:52}
+#game-menu-drawer{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:min(460px,calc(100vw - 24px));max-height:calc(100dvh - 24px);overflow:auto;background:#142c2af8;border:1px solid #8bac9b;border-radius:18px;box-shadow:0 18px 80px #000b;z-index:58;padding:18px;color:#f6f5e6;overscroll-behavior:contain;touch-action:pan-y}
+#game-menu-backdrop[hidden],#game-menu-drawer[hidden]{display:none}
+#game-menu-drawer .menu-top{display:flex;justify-content:space-between;align-items:center;gap:12px}
+#game-menu-drawer .menu-top strong{font-size:16px;letter-spacing:.08em}
+#game-menu-drawer .menu-top button{min-height:44px;min-width:44px;background:#35544d;border:1px solid #91ad9e;color:white;border-radius:10px;touch-action:manipulation}
+#game-menu-drawer .menu-subtitle{font-size:11px;letter-spacing:.16em;color:#afc9bc;margin:12px 0}
+#game-menu-drawer .menu-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+#game-menu-drawer .menu-grid button{min-height:78px;display:flex;align-items:center;text-align:left;gap:10px;background:#24443d;border:1px solid #6e9985;border-radius:12px;padding:12px;color:#fffaf0;touch-action:manipulation}
+#game-menu-drawer .menu-entry-icon{font-size:23px;flex:none}
+#game-menu-drawer .menu-entry-text{display:flex;flex-direction:column;gap:3px;min-width:0}
+#game-menu-drawer .menu-entry-text strong{font-size:13px}
+#game-menu-drawer .menu-entry-text small{font-size:10px;color:#b8d4c5}
+#game-menu-drawer .menu-footnote{color:#b2c4bd;font-size:11px;line-height:1.45}
+.game-menu-enabled #world-map-toggle,.game-menu-enabled #inventory-toggle,.game-menu-enabled #quest-toggle,.game-menu-enabled #character-toggle{display:none}
+.game-menu-enabled #multiplayer-panel{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:flex;flex-wrap:wrap;justify-content:center;gap:9px;width:min(440px,calc(100vw - 30px));max-width:none;background:#173730;padding:22px 14px 16px;border:1px solid #a4c6af;border-radius:16px;z-index:59}
+.game-menu-enabled #multiplayer-panel[hidden]{display:none}
+.game-menu-enabled #multiplayer-panel input{width:100%;max-width:none;min-height:44px;font-size:14px}
+.game-menu-enabled #multiplayer-panel button{min-height:44px;flex:1;font-size:13px}
+.game-menu-enabled #world-map-panel,.game-menu-enabled #inventory-panel,.game-menu-enabled #quest-panel,.game-menu-enabled #character-panel{z-index:59;max-height:calc(100dvh - 85px);top:calc(50% + 16px);touch-action:pan-y;overscroll-behavior:contain}
+.game-menu-enabled #world-map-panel[hidden],.game-menu-enabled #inventory-panel[hidden],.game-menu-enabled #quest-panel[hidden],.game-menu-enabled #character-panel[hidden]{display:none}
+.game-menu-enabled #game-menu-button{z-index:65}
+.game-menu-enabled header{left:max(122px,env(safe-area-inset-left) + 122px)}
+.game-menu-enabled #combat-hud{top:78px}
+.game-menu-enabled #status{top:max(12px,env(safe-area-inset-top));max-width:40vw}
+.game-menu-enabled #resource-guide{top:119px}
+.game-menu-enabled #exploration{top:80px}
+.game-menu-enabled #world-coordinates{top:54px}
+#actions .action-context-ready{border-color:#83e7b8!important;background:#225f40e8!important;box-shadow:0 0 0 3px #4cbb7344}
+@media(max-width:700px){
+  .game-menu-enabled header{left:112px;top:max(13px,env(safe-area-inset-top))}
+  .game-menu-enabled header strong{font-size:12px;letter-spacing:0}
+  .game-menu-enabled header small{display:none}
+  .game-menu-enabled #status{top:54px;right:8px;max-width:48vw}
+  .game-menu-enabled #combat-hud{top:98px;max-width:43vw;min-width:0}
+  .game-menu-enabled #combat-hud meter{width:65px}
+  .game-menu-enabled #resource-guide{top:113px;width:min(150px,31vw)}
+  .game-menu-enabled #exploration{display:none}
+  .game-menu-enabled #world-coordinates{display:none}
+  #game-menu-drawer{padding:13px}
+  #game-menu-drawer .menu-grid button{min-height:72px;padding:9px}
+}
+@media(max-height:420px){
+  .game-menu-enabled #combat-hud{top:67px}
+  .game-menu-enabled #resource-guide{top:71px}
+  #game-menu-drawer .menu-grid button{min-height:56px}
+  .game-menu-enabled #world-map-panel,.game-menu-enabled #inventory-panel,.game-menu-enabled #quest-panel,.game-menu-enabled #character-panel{max-height:calc(100dvh - 65px);top:calc(50% + 12px)}
+}

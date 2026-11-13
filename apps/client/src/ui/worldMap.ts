@@ -90,6 +90,8 @@ export class WorldMap {
       this.dirty=true;this.render();
     });
   }
+  open():void{this.setVisible(true);}
+  close():void{this.setVisible(false);}
   private setVisible(next:boolean):void{
     this.visible=next;
     this.panel.hidden=!next;

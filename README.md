@@ -263,6 +263,10 @@ Ironstone Outcrops are deterministic world landmarks. Press **GATHER** within fi
 
 The Android client now shows the **nearest Ironstone Outcrop within 1.2 km** with distance and compass bearing. **TRACK ORE** places a navigation waypoint without revealing fog-of-war. Within 75 meters, the ore is highlighted by a cyan ground ring; within 5 meters the tracker prompts GATHER. Successful and depleted gather responses carry the server's remaining replenishment time, shown as a countdown hint. The BAG interface explains which ingredients are still missing for Ironblade and where to craft it. The server continues to check real ore node availability and recipe material counts; the client guidance is not authoritative. See [Resource Guidance](docs/RESOURCE_GUIDANCE.md).
 
+### Responsive Android game HUD and navigation
+
+The main game now uses a single **☰ MENU** to access MAP, BACKPACK, QUESTS, CHARACTER and MULTIPLAYER. This replaces multiple stacked corner buttons, keeps the joystick and combat controls available during exploration, and provides a responsive drawer with larger touch targets, safe-area padding and scrollable panels. The GATHER action highlights as **MINE** when an online player is within ore interaction range. The original game panels remain in use and share a single-navigation controller. See [Android Game Menu](docs/ANDROID_GAME_MENU.md).
+
 ### Guest persistence
 
 - SQLite via Bun's `bun:sqlite`.
@@ -783,6 +787,7 @@ Frequency:
 - [Equipment and Combat Stats](docs/EQUIPMENT_COMBAT.md)
 - [Gathering and Crafting](docs/GATHERING_CRAFTING.md)
 - [Resource Guidance and Android Crafting UX](docs/RESOURCE_GUIDANCE.md)
+- [Android Game Menu and HUD](docs/ANDROID_GAME_MENU.md)
 - [World Streaming](docs/WORLD_STREAMING.md)
 - [Terrain and Biomes](docs/TERRAIN_BIOMES.md)
 - [World Landmarks / Content](docs/WORLD_CONTENT.md)
