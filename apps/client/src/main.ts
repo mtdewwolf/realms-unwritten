@@ -184,6 +184,18 @@ const controlledPanels=[
   {tab:"network" as const,open:()=>{multiplayerPanel.hidden=false;serverUrlInput.focus();},close:()=>{multiplayerPanel.hidden=true;serverUrlInput.blur();}}
 ];
 for(const panel of controlledPanels)gameMenu.register(panel.tab,panel);
+// Close controls inside each legacy panel must also close the centralized backdrop.
+for(const selector of ["#map-close","#bag-close","#quest-close","#character-close"]){
+  const close=app.querySelector<HTMLButtonElement>(selector);
+  close?.addEventListener("click",()=>gameMenu.close());
+}
+// Keep the desktop M shortcut routed through the same single-panel controller.
+window.addEventListener("keydown",event=>{
+  if(event.key.toLowerCase()!=="m"||event.repeat||event.target instanceof HTMLInputElement||event.target instanceof HTMLTextAreaElement)return;
+  gameMenu.navigate("map");
+  event.preventDefault();
+  event.stopImmediatePropagation();
+},true);
 multiplayerPanel.hidden=true;
 app.classList.add("game-menu-enabled");
 const isLocalHost=["localhost","127.0.0.1"].includes(location.hostname);
