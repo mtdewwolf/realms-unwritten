@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import {groundHeightAt} from "../world/chunkedWorld";
-import {closestOre,workshopDistance,ORE_INTERACT_RANGE,WORKSHOP_INTERACT_RANGE,type ResourceTarget} from "./resourceGuidance";
+import {closestResource,workshopDistance,ORE_INTERACT_RANGE,WORKSHOP_INTERACT_RANGE,type ResourceTarget} from "./resourceGuidance";
 
 export class ResourceGuide{
   readonly element:HTMLElement;
@@ -13,7 +13,7 @@ export class ResourceGuide{
   constructor(host:HTMLElement,scene:THREE.Scene,private readonly track:(x:number,z:number)=>void){
     this.element=document.createElement("aside");
     this.element.id="resource-guide";this.element.setAttribute("aria-label","Mining and crafting guidance");
-    this.element.innerHTML='<strong>⛏ IRONSTONE</strong><p id="resource-distance">Searching for ore…</p><button type="button" id="resource-track">TRACK ORE</button><p id="resource-workshop"></p>';
+    this.element.innerHTML='<strong>🌿 RESOURCES</strong><p id="resource-distance">Searching for ore…</p><button type="button" id="resource-track">TRACK RESOURCE</button><p id="resource-workshop"></p>';
     host.appendChild(this.element);
     this.trackButton=this.element.querySelector<HTMLButtonElement>("#resource-track")!;
     this.trackButton.addEventListener("click",()=>{if(this.target)this.track(this.target.x,this.target.z);});
@@ -28,7 +28,7 @@ export class ResourceGuide{
     this.cooldownId=nodeId;this.cooldownEndsAt=now+Math.min(600_000,retryMs);
   }
   update(x:number,z:number,online:boolean,now=performance.now()):void{
-    this.target=closestOre(x,z);
+    this.target=closestResource(x,z);
     this.trackButton.disabled=!this.target;
     const distance=this.element.querySelector<HTMLElement>("#resource-distance")!;
     const shop=this.element.querySelector<HTMLElement>("#resource-workshop")!;
@@ -38,12 +38,14 @@ export class ResourceGuide{
     if(this.target&&this.marker.visible){
       this.marker.position.set(this.target.x,groundHeightAt(this.target.x,this.target.z)+.13,this.target.z);
       this.ring.rotation.z=now*.0005;
+      (this.ring.material as THREE.MeshBasicMaterial).color.setHex(this.target.kind==="moonleaf"?0x8ef6a5:0x8de6fc);
     }
-    if(!this.target){distance.textContent="No ore nearby · explore outward";return;}
+    if(!this.target){distance.textContent="No resources nearby · explore outward";return;}
+    const resource=this.target.kind==="moonleaf"?"Moonleaf":"Ore";
     const remaining=this.target.id===this.cooldownId?Math.max(0,Math.ceil((this.cooldownEndsAt-now)/1000)):0;
-    if(remaining>0){distance.textContent="Ore replenishes in "+remaining+"s";return;}
-    if(this.target.inRange){distance.textContent=online?"Ore in range · press GATHER":"Ore in range · connect to mine";return;}
-    distance.textContent="Nearest ore "+Math.round(this.target.distance)+"m · "+Math.round(this.target.bearing)+"°";
+    if(remaining>0){distance.textContent=resource+" replenishes in "+remaining+"s";return;}
+    if(this.target.inRange){distance.textContent=online?resource+" in range · press GATHER":resource+" in range · connect to gather";return;}
+    distance.textContent="Nearest "+resource+" "+Math.round(this.target.distance)+"m · "+Math.round(this.target.bearing)+"°";
   }
   currentTarget():ResourceTarget|null{return this.target;}
 }

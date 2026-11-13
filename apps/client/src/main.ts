@@ -123,7 +123,7 @@ const exploration = document.querySelector<HTMLElement>("#exploration")!;
 const atlas = new WorldMap(app);
 const resourceGuide=new ResourceGuide(app,scene,(x,z)=>atlas.setWaypoint({x,z}));
 let lastResourceUpdate=0;
-const inventoryPanel=new InventoryPanel(app,item=>multiplayer.sendEquip(item),()=>multiplayer.sendCraft());
+const inventoryPanel=new InventoryPanel(app,item=>multiplayer.sendEquip(item),recipe=>multiplayer.sendCraft(recipe),()=>multiplayer.useTonic());
 const questPanel=new QuestPanel(app,scene,action=>multiplayer.sendQuest(action));
 const characterPanel=new CharacterPanel(app,()=>multiplayer.requestProgression());
 inventoryPanel.button.addEventListener("click",()=>multiplayer.requestInventory());
@@ -403,10 +403,11 @@ function frame(now: number) {
   atlas.update(avatar.position.x,avatar.position.z,now);
   if(now-lastResourceUpdate>=500){
     resourceGuide.update(avatar.position.x,avatar.position.z,multiplayer.connected,now);
-    const nearOre=resourceGuide.currentTarget()?.inRange===true;
+    const nearResource=resourceGuide.currentTarget()?.inRange===true;
+    const kind=resourceGuide.currentTarget()?.kind;
     const gatherButton=document.querySelector<HTMLButtonElement>("#gather")!;
-    gatherButton.querySelector("span")!.textContent=nearOre?"MINE":"GATHER";
-    gatherButton.classList.toggle("action-context-ready",nearOre&&multiplayer.connected);
+    gatherButton.querySelector("span")!.textContent=nearResource?(kind==="moonleaf"?"PICK":"MINE"):"GATHER";
+    gatherButton.classList.toggle("action-context-ready",nearResource&&multiplayer.connected);
     lastResourceUpdate=now;
   }
   world.update(avatar.position.x,avatar.position.z);

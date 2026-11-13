@@ -121,6 +121,12 @@ async function run(){
   const craft=waitFor(first.socket,"resource_result");
   first.socket.send(JSON.stringify({type:"craft",recipe:"ironblade",ore:999}));
   if((await craft).ok)throw Error("Free item crafting accepted");
+  const tonic=waitFor(first.socket,"use_result");
+  first.socket.send(JSON.stringify({type:"use",item:"healing-tonic",health:1}));
+  if((await tonic).ok)throw Error("Healing without inventory or damage was accepted");
+  const unearned=waitFor(first.socket,"resource_result");
+  first.socket.send(JSON.stringify({type:"craft",recipe:"healing-tonic",moonleaf:999}));
+  if((await unearned).ok)throw Error("Forged Moonleaf crafting was accepted");
   console.log("PASS multiplayer smoke: shared combat, quest, equipment and rejected forged gathering/crafting");
 }
 try{await run();}

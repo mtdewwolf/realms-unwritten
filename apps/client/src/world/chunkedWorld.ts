@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { biomeAt, terrainHeightAt, terrainColorAt, TERRAIN_GRID_STEP } from "./terrain";
 import { addChunkLandmarks, disposeChunkLandmarks } from "./landmarkVisuals";
 import { addChunkInfrastructure, disposeChunkInfrastructure } from "./infrastructureVisuals";
+import {herbsInChunk} from "./herbs";
 
 export const CHUNK_SIZE=64;
 export const WORLD_CHUNKS_PER_SIDE=256;
@@ -79,6 +80,10 @@ export class ChunkedWorld {
   private readonly stoneGeo=new THREE.DodecahedronGeometry(.8,0);
   private readonly trunkMat=new THREE.MeshLambertMaterial({color:0x76553a});
   private readonly stoneMat=new THREE.MeshLambertMaterial({color:0x91938b,flatShading:true});
+  private readonly herbLeafGeo=new THREE.OctahedronGeometry(.55,0);
+  private readonly herbLeafMat=new THREE.MeshLambertMaterial({color:0x6fe4a1,flatShading:true});
+  private readonly herbCoreGeo=new THREE.OctahedronGeometry(.25,0);
+  private readonly herbCoreMat=new THREE.MeshBasicMaterial({color:0xbefbe8});
   private readonly foliageMat=[
     new THREE.MeshLambertMaterial({color:0x3c6944}),
     new THREE.MeshLambertMaterial({color:0x667940}),
@@ -131,6 +136,15 @@ export class ChunkedWorld {
     }
     rocks.instanceMatrix.needsUpdate=true;
     group.add(rocks);
+    for(const herb of herbsInChunk(cx,cz,CHUNK_SIZE)){
+      const plant=new THREE.Group();
+      const leaf=new THREE.Mesh(this.herbLeafGeo,this.herbLeafMat);
+      leaf.scale.set(1.5,.8,1.5);leaf.position.y=.45;plant.add(leaf);
+      const core=new THREE.Mesh(this.herbCoreGeo,this.herbCoreMat);
+      core.position.y=1.05;plant.add(core);
+      plant.position.set(herb.x-cx*CHUNK_SIZE,groundHeightAt(herb.x,herb.z),herb.z-cz*CHUNK_SIZE);
+      group.add(plant);
+    }
     addChunkLandmarks(group,cx,cz,CHUNK_SIZE,groundHeightAt);
     addChunkInfrastructure(group,cx,cz,CHUNK_SIZE,groundHeightAt);
     return {group,geometry};

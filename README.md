@@ -214,7 +214,7 @@ Server entry point: `apps/server/src/index.ts`. Core movement: `simulation.ts`. 
 - `GET /ws` with WebSocket upgrade: multiplayer connection.
 - Default port: **3001**; configurable via `PORT`.
 - Bind address: `0.0.0.0` by default; override via `HOST`.
-- Protocol version: **7** (client/server must use matching builds).
+- Protocol version: **8** (client/server must use matching builds).
 - Clients send `hello` with an optional existing guest token and optional sanitized display name; server sends `welcome` with player ID, token, initial position.
 - Clients send numbered movement vectors, not positions; server clamps speed and world bounds.
 - Server returns `snapshot` containing own authoritative position, acknowledgment sequence and nearby players.
@@ -266,6 +266,10 @@ The Android client now shows the **nearest Ironstone Outcrop within 1.2 km** wit
 ### Responsive Android game HUD and navigation
 
 The main game now uses a single **☰ MENU** to access MAP, BACKPACK, QUESTS, CHARACTER and MULTIPLAYER. This replaces multiple stacked corner buttons, keeps the joystick and combat controls available during exploration, and provides a responsive drawer with larger touch targets, safe-area padding and scrollable panels. The GATHER action highlights as **MINE** when an online player is within ore interaction range. The original game panels remain in use and share a single-navigation controller. See [Android Game Menu](docs/ANDROID_GAME_MENU.md).
+
+### Moonleaf Foraging and Healing Tonics
+
+Deterministic **Moonleaf** plants now appear in meadow and woodland regions and render as visible green crystal-leaf clusters. Server-validated GATHER/PICK yields one Moonleaf from a shared node with a **45-second persisted respawn cooldown**. At Verdant Reach, two Moonleaf craft one Healing Tonic in a single SQLite transaction; a server-validated USE consumes a tonic to restore up to **30 HP**, only if the player is alive and injured. Offline mode cannot craft or grant materials. The resource tracker now guides players to either ore or herbs. This is the second playable gathering loop; the larger economy and player health persistence are still outstanding. Protocol **v8**. See [Moonleaf and Tonics](docs/MOONLEAF_TONICS.md).
 
 ### Guest persistence
 
@@ -513,7 +517,7 @@ Run this in addition to `bun test`; it is not a normal `test/*.test.ts` unit tes
    curl -fsS http://127.0.0.1:3001/health
    ```
 
-3. Verify response has `"ok":true`, protocol version `7`, and the online player count.
+3. Verify response has `"ok":true`, protocol version `8`, and the online player count.
 4. Open the client and connect to `ws://127.0.0.1:3001/ws` (when client and server are on the same machine).
 5. Confirm the connection-status message switches to online. Disconnect and verify offline exploration continues.
 6. In the terminal, check for runtime exceptions and ensure the server remains running.
@@ -671,7 +675,7 @@ adb logcat > android-session.log
 - [ ] Android Gradle `assembleDebug` succeeds and artifact exists.
 - [ ] Offline exploration still works.
 - [ ] Two distinct guest clients can connect and see movement.
-- [ ] In protocol v7, they agree on shared wolf HP/phase and rejected forged attacks.
+- [ ] In protocol v8, they agree on shared wolf HP/phase and rejected forged attacks.
 - [ ] Position persistence survives a graceful restart.
 - [ ] World chunks, road geometry, map and discovery states remain stable.
 - [ ] Real Android device boot/controls/performance verified for release candidates.
@@ -788,6 +792,7 @@ Frequency:
 - [Gathering and Crafting](docs/GATHERING_CRAFTING.md)
 - [Resource Guidance and Android Crafting UX](docs/RESOURCE_GUIDANCE.md)
 - [Android Game Menu and HUD](docs/ANDROID_GAME_MENU.md)
+- [Moonleaf Foraging and Healing Tonics](docs/MOONLEAF_TONICS.md)
 - [World Streaming](docs/WORLD_STREAMING.md)
 - [Terrain and Biomes](docs/TERRAIN_BIOMES.md)
 - [World Landmarks / Content](docs/WORLD_CONTENT.md)

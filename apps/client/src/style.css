@@ -131,3 +131,7 @@
   #game-menu-drawer .menu-grid button{min-height:56px}
   .game-menu-enabled #world-map-panel,.game-menu-enabled #inventory-panel,.game-menu-enabled #quest-panel,.game-menu-enabled #character-panel{max-height:calc(100dvh - 65px);top:calc(50% + 12px)}
 }
+
+#bag-craft-tonic,#bag-use-tonic{display:block;width:100%;margin-top:9px;padding:11px;border:1px solid #7bad95;border-radius:9px;background:#345f47;color:#edffe9;font-weight:700;touch-action:manipulation}
+#bag-use-tonic{background:#584943;border-color:#b7a28c}
+#bag-craft-tonic:disabled,#bag-use-tonic:disabled{opacity:.45}

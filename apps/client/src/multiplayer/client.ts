@@ -10,7 +10,7 @@ export interface ServerWolf{id:string;x:number;z:number;heading:number;health:nu
 export interface ServerVitals{health:number;stamina:number;maxHealth:number;maxStamina:number;alive:boolean}
 interface Snapshot{type:"snapshot";tick:number;you:PlayerState;others:PlayerState[];ack:number;vitals:ServerVitals;wolf:ServerWolf|null}
 export interface CombatActionResult{type:"action_result";seq:number;action:"attack"|"dodge";ok:boolean;reason?:string;wolfHealth:number;health:number;stamina:number}
-type ServerMessage={type:"resource_result";action:"gather"|"craft";ok:boolean;reason?:string;item?:string;amount?:number;nodeId?:string;retryAfterMs?:number}|{type:"equip_result";ok:boolean;reason?:string}|{type:"welcome";protocol:number;id:string;token:string;player:PlayerState}|Snapshot|CombatActionResult|InventoryState|RewardEvent|QuestState|QuestResult|ProgressionState|{type:"error";message:string};
+type ServerMessage={type:"use_result";ok:boolean;reason?:string;item?:string;health?:number}|{type:"resource_result";action:"gather"|"craft";ok:boolean;reason?:string;item?:string;amount?:number;nodeId?:string;retryAfterMs?:number}|{type:"equip_result";ok:boolean;reason?:string}|{type:"welcome";protocol:number;id:string;token:string;player:PlayerState}|Snapshot|CombatActionResult|InventoryState|RewardEvent|QuestState|QuestResult|ProgressionState|{type:"error";message:string};
 export interface MovementInput{dx:number;dz:number}
 const TOKEN_KEY="realms-unwritten-guest-token-v1";
 function storedToken():string|null{try{return localStorage.getItem(TOKEN_KEY);}catch{return null;}}
@@ -38,11 +38,12 @@ export class MultiplayerClient {
       try{message=JSON.parse(String(event.data)) as ServerMessage;}catch{return;}
       if(message.type==="error"){this.status(message.message);return;}
       if(message.type==="welcome"){
-        if(message.protocol!==7){ws.close();this.status("Incompatible server protocol");return;}
+        if(message.protocol!==8){ws.close();this.status("Incompatible server protocol");return;}
         this.id=message.id;saveToken(message.token);this.online=true;
         this.avatar.position.x=message.player.x;this.avatar.position.z=message.player.z;
         this.status("Online · authoritative movement connected");return;
       }
+      if(message.type==="use_result"){this.status(message.ok?"Healing Tonic used · health "+message.health:"Cannot use tonic: "+(message.reason??"Unavailable"));return;}
       if(message.type==="progression"){this.onProgression(message);return;}
       if(message.type==="quest_status"){this.onQuest(message);return;}
       if(message.type==="quest_result"){this.onQuestResult(message);return;}
@@ -100,9 +101,13 @@ export class MultiplayerClient {
     if(!this.connected)return false;
     this.socket!.send(JSON.stringify({type:"gather"}));return true;
   }
-  sendCraft():boolean{
+  sendCraft(recipe:"ironblade"|"healing-tonic"="ironblade"):boolean{
     if(!this.connected)return false;
-    this.socket!.send(JSON.stringify({type:"craft",recipe:"ironblade"}));return true;
+    this.socket!.send(JSON.stringify({type:"craft",recipe}));return true;
+  }
+  useTonic():boolean{
+    if(!this.connected)return false;
+    this.socket!.send(JSON.stringify({type:"use",item:"healing-tonic"}));return true;
   }
   sendEquip(item:"starter-sword"|"fangblade"|"ironblade"):boolean{
     if(!this.connected)return false;

@@ -1,4 +1,4 @@
-export interface InventoryItem{id:"wolf-pelt"|"wolf-fang"|"fangblade"|"iron-ore"|"ironblade";name:string;quantity:number}
+export interface InventoryItem{id:"wolf-pelt"|"wolf-fang"|"fangblade"|"iron-ore"|"ironblade"|"moonleaf"|"healing-tonic";name:string;quantity:number}
 export interface InventoryState{type:"inventory";items:InventoryItem[];coins:number;equipped:{id:"starter-sword"|"fangblade"|"ironblade";name:string;bonusDamage:number}}
 export interface RewardEvent{type:"reward";eventId:string;items:InventoryItem[];coins:number}
 export class InventoryPanel{
@@ -7,17 +7,19 @@ export class InventoryPanel{
   private readonly coins:HTMLElement;
   private readonly items:HTMLElement;
   private readonly equipment:HTMLElement;
-  constructor(host:HTMLElement,private readonly equip:(weapon:"starter-sword"|"fangblade"|"ironblade")=>boolean,private readonly craft:()=>boolean){
+  constructor(host:HTMLElement,private readonly equip:(weapon:"starter-sword"|"fangblade"|"ironblade")=>boolean,private readonly craft:(recipe:"ironblade"|"healing-tonic")=>boolean,private readonly useTonic:()=>boolean){
     this.button=document.createElement("button");this.button.id="inventory-toggle";
     this.button.type="button";this.button.textContent="🎒 BAG";host.appendChild(this.button);
     this.element=document.createElement("section");this.element.id="inventory-panel";this.element.hidden=true;
     this.element.setAttribute("aria-label","Inventory");
-    this.element.innerHTML='<div class="bag-heading"><strong>BACKPACK</strong><button type="button" id="bag-close">✕</button></div><p id="bag-coins"></p><div id="bag-equipment"></div><div id="bag-items"></div><button type="button" id="bag-craft">⚒ Craft Ironblade (2 Ore + 1 Fang)</button><p class="bag-note">The server owns your items. Defeat the wolf online to earn loot.</p>';
+    this.element.innerHTML='<div class="bag-heading"><strong>BACKPACK</strong><button type="button" id="bag-close">✕</button></div><p id="bag-coins"></p><div id="bag-equipment"></div><div id="bag-items"></div><button type="button" id="bag-craft">⚒ Craft Ironblade (2 Ore + 1 Fang)</button><button type="button" id="bag-craft-tonic">🌿 Craft Healing Tonic (2 Moonleaf)</button><button type="button" id="bag-use-tonic">❤ Use Healing Tonic (+30 HP)</button><p class="bag-note">The server owns your items. Defeat the wolf online to earn loot.</p>';
     host.appendChild(this.element);
     this.coins=this.element.querySelector<HTMLElement>("#bag-coins")!;
     this.items=this.element.querySelector<HTMLElement>("#bag-items")!;
     this.equipment=this.element.querySelector<HTMLElement>("#bag-equipment")!;
-    this.element.querySelector("#bag-craft")!.addEventListener("click",()=>this.craft());
+    this.element.querySelector("#bag-craft")!.addEventListener("click",()=>this.craft("ironblade"));
+    this.element.querySelector("#bag-craft-tonic")!.addEventListener("click",()=>this.craft("healing-tonic"));
+    this.element.querySelector("#bag-use-tonic")!.addEventListener("click",()=>this.useTonic());
     this.button.addEventListener("click",()=>this.element.hidden=!this.element.hidden);
     this.element.querySelector("#bag-close")!.addEventListener("click",()=>this.element.hidden=true);
     this.offline();
@@ -39,6 +41,9 @@ export class InventoryPanel{
     }
     const craftButton=this.element.querySelector<HTMLButtonElement>("#bag-craft")!;
     craftButton.disabled=!state.items.some(i=>i.id==="iron-ore"&&i.quantity>=2)||!state.items.some(i=>i.id==="wolf-fang"&&i.quantity>=1);
+    const herbs=state.items.find(i=>i.id==="moonleaf")?.quantity??0;
+    this.element.querySelector<HTMLButtonElement>("#bag-craft-tonic")!.disabled=herbs<2;
+    this.element.querySelector<HTMLButtonElement>("#bag-use-tonic")!.disabled=!(state.items.some(i=>i.id==="healing-tonic"&&i.quantity>0));
     const missingOre=Math.max(0,2-(state.items.find(i=>i.id==="iron-ore")?.quantity??0));
     const missingFang=Math.max(0,1-(state.items.find(i=>i.id==="wolf-fang")?.quantity??0));
     const note=this.element.querySelector<HTMLElement>(".bag-note")!;
@@ -56,5 +61,7 @@ export class InventoryPanel{
     this.items.textContent="Connect to the Bun server to view saved items.";
     this.equipment.replaceChildren();
     this.element.querySelector<HTMLButtonElement>("#bag-craft")!.disabled=true;
+    this.element.querySelector<HTMLButtonElement>("#bag-craft-tonic")!.disabled=true;
+    this.element.querySelector<HTMLButtonElement>("#bag-use-tonic")!.disabled=true;
   }
 }
