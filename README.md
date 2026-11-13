@@ -259,6 +259,10 @@ Characters begin with a default **Worn Sword (+0 weapon damage)**. Completing Wo
 
 Ironstone Outcrops are deterministic world landmarks. Press **GATHER** within five meters of an ore landmark while online to receive **1 Iron Ore**. The server checks authoritative position, living status and each node's **30-second shared SQLite cooldown**; clients cannot submit alternate coordinates or mint their own ore. At the Verdant Reach guard/workshop, open BAG and craft an **Ironblade** from **2 Iron Ore + 1 Wolf Fang**. The recipe atomically deducts materials and creates an equippable **Ironblade (+12 damage)**. Offline gathering and crafting are not supported. Protocol v7. See [Gathering and Crafting](docs/GATHERING_CRAFTING.md).
 
+### Resource discovery and Android crafting guidance
+
+The Android client now shows the **nearest Ironstone Outcrop within 1.2 km** with distance and compass bearing. **TRACK ORE** places a navigation waypoint without revealing fog-of-war. Within 75 meters, the ore is highlighted by a cyan ground ring; within 5 meters the tracker prompts GATHER. Successful and depleted gather responses carry the server's remaining replenishment time, shown as a countdown hint. The BAG interface explains which ingredients are still missing for Ironblade and where to craft it. The server continues to check real ore node availability and recipe material counts; the client guidance is not authoritative. See [Resource Guidance](docs/RESOURCE_GUIDANCE.md).
+
 ### Guest persistence
 
 - SQLite via Bun's `bun:sqlite`.
@@ -778,6 +782,7 @@ Frequency:
 - [Character Progression](docs/CHARACTER_PROGRESSION.md)
 - [Equipment and Combat Stats](docs/EQUIPMENT_COMBAT.md)
 - [Gathering and Crafting](docs/GATHERING_CRAFTING.md)
+- [Resource Guidance and Android Crafting UX](docs/RESOURCE_GUIDANCE.md)
 - [World Streaming](docs/WORLD_STREAMING.md)
 - [Terrain and Biomes](docs/TERRAIN_BIOMES.md)
 - [World Landmarks / Content](docs/WORLD_CONTENT.md)
