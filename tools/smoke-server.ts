@@ -64,6 +64,26 @@ async function run(){
   const attack=await attackResult;
   if(attack.ok||attack.reason!=="target out of range"||attack.wolfHealth!==60)
     throw new Error("Server accepted an out-of-range or client-forged damage claim: "+JSON.stringify(attack));
+  const deniedAbility=new Promise<any>((resolve,reject)=>{
+    const timer=setTimeout(()=>reject(Error("Cross-class ability response timed out")),3000);
+    first.socket.addEventListener("message",function listener(e){
+      const p=JSON.parse(String(e.data));
+      if(p.type!=="ability_result"||p.seq!==2)return;
+      first.socket.removeEventListener("message",listener);clearTimeout(timer);resolve(p);
+    });
+  });
+  first.socket.send(JSON.stringify({type:"ability",seq:2,ability:"arc-bolt",damage:9999}));
+  if((await deniedAbility).ok)throw Error("Server accepted an unearned class ability");
+  const confirmedAbility=new Promise<any>((resolve,reject)=>{
+    const timer=setTimeout(()=>reject(Error("Vanguard ability response timed out")),3000);
+    first.socket.addEventListener("message",function listener(e){
+      const p=JSON.parse(String(e.data));
+      if(p.type!=="ability_result"||p.seq!==3)return;
+      first.socket.removeEventListener("message",listener);clearTimeout(timer);resolve(p);
+    });
+  });
+  first.socket.send(JSON.stringify({type:"ability",seq:3,ability:"bulwark"}));
+  if(!(await confirmedAbility).ok)throw Error("Vanguard Bulwark was rejected");
   const sharedSnapshot=new Promise<void>((resolve,reject)=>{
     const timeout=setTimeout(()=>reject(new Error("Shared wolf snapshot timed out")),3500);
     second.socket.addEventListener("message",e=>{
