@@ -271,6 +271,10 @@ The main game now uses a single **☰ MENU** to access MAP, BACKPACK, QUESTS, CH
 
 Deterministic **Moonleaf** plants now appear in meadow and woodland regions and render as visible green crystal-leaf clusters. Server-validated GATHER/PICK yields one Moonleaf from a shared node with a **45-second persisted respawn cooldown**. At Verdant Reach, two Moonleaf craft one Healing Tonic in a single SQLite transaction; a server-validated USE consumes a tonic to restore up to **30 HP**, only if the player is alive and injured. Offline mode cannot craft or grant materials. The resource tracker now guides players to either ore or herbs. This is the second playable gathering loop; the larger economy and player health persistence are still outstanding. Protocol **v8**. See [Moonleaf and Tonics](docs/MOONLEAF_TONICS.md).
 
+### Authoritative house collision
+
+Bun now enforces **circle-versus-rectangle collisions** against the three Verdant Reach starter houses and generated settlement houses. The Android client uses the same deterministic resolver for offline walking and dash visualization. Diagonal movement slides along walls; movement uses substeps to avoid passing through narrow building footprints. Existing character positions inside houses are relocated safely upon login. This is a first building-collision milestone, not complete physical world collision: terrain props and cliffs remain non-blocking. See [Building Collision](docs/BUILDING_COLLISION.md).
+
 ### Guest persistence
 
 - SQLite via Bun's `bun:sqlite`.
@@ -793,6 +797,7 @@ Frequency:
 - [Resource Guidance and Android Crafting UX](docs/RESOURCE_GUIDANCE.md)
 - [Android Game Menu and HUD](docs/ANDROID_GAME_MENU.md)
 - [Moonleaf Foraging and Healing Tonics](docs/MOONLEAF_TONICS.md)
+- [Authoritative Building Collision](docs/BUILDING_COLLISION.md)
 - [World Streaming](docs/WORLD_STREAMING.md)
 - [Terrain and Biomes](docs/TERRAIN_BIOMES.md)
 - [World Landmarks / Content](docs/WORLD_CONTENT.md)

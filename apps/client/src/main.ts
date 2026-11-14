@@ -11,6 +11,7 @@ import { QuestPanel } from "./ui/quests";
 import { CharacterPanel } from "./ui/character";
 import { ResourceGuide } from "./ui/resourceGuide";
 import { GameMenu } from "./ui/gameMenu";
+import { moveWithCollision } from "./world/collision";
 import { settlementsNear, discoverySettlements } from "./world/settlements";
 import { createAdventurer, createWolf } from "./characters/rig";
 import { mountAnimatedAsset, type AnimatedAsset, type AnimationState } from "./characters/animatedAsset";
@@ -306,9 +307,8 @@ function dodge() {
   playerStamina=next;
   dodgeUntil=now+0.6;
   const direction=new THREE.Vector3(Math.sin(avatar.rotation.y),0,Math.cos(avatar.rotation.y));
-  avatar.position.addScaledVector(direction,2.25);
-  avatar.position.x=THREE.MathUtils.clamp(avatar.position.x,-WORLD_HALF_SIZE+2,WORLD_HALF_SIZE-2);
-  avatar.position.z=THREE.MathUtils.clamp(avatar.position.z,-WORLD_HALF_SIZE+2,WORLD_HALF_SIZE-2);
+  const landing=moveWithCollision(avatar.position.x,avatar.position.z,direction.x*2.25,direction.z*2.25);
+  avatar.position.x=landing.x;avatar.position.z=landing.z;
   battleInfo.textContent="Dodged!";
 }
 document.querySelector("#attack")!.addEventListener("click", attack);
@@ -341,7 +341,10 @@ function frame(now: number) {
     const forward = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw));
     const right = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw));
     const heading = right.multiplyScalar(x).addScaledVector(forward, -z).normalize();
-    if(!multiplayer.connected)avatar.position.addScaledVector(heading, dt * 5.5);
+    if(!multiplayer.connected){
+      const next=moveWithCollision(avatar.position.x,avatar.position.z,heading.x*dt*5.5,heading.z*dt*5.5);
+      avatar.position.x=next.x;avatar.position.z=next.z;
+    }
     avatar.position.x = THREE.MathUtils.clamp(avatar.position.x, -WORLD_HALF_SIZE+2, WORLD_HALF_SIZE-2);
     avatar.position.z = THREE.MathUtils.clamp(avatar.position.z, -WORLD_HALF_SIZE+2, WORLD_HALF_SIZE-2);
     avatar.rotation.y = Math.atan2(heading.x, heading.z);

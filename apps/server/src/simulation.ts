@@ -1,3 +1,4 @@
+import {moveWithCollision,safeSpawn} from "../../client/src/world/collision";
 import {AOI_RADIUS,MOVEMENT_SPEED,SIMULATION_HZ,WORLD_HALF_EXTENT,validateInput,type InputMessage,type PlayerState,type SnapshotMessage} from "./protocol";
 
 export interface SimPlayer extends PlayerState {
@@ -12,15 +13,16 @@ export function stepMovement(player:SimPlayer,dt:number):void{
   if(norm<.001)return;
   const factor=Math.min(1,1/norm);
   const vx=player.dx*factor,vz=player.dz*factor;
-  player.x=Math.max(-limit,Math.min(limit,player.x+vx*MOVEMENT_SPEED*dt));
-  player.z=Math.max(-limit,Math.min(limit,player.z+vz*MOVEMENT_SPEED*dt));
+  const next=moveWithCollision(player.x,player.z,vx*MOVEMENT_SPEED*dt,vz*MOVEMENT_SPEED*dt);
+  player.x=next.x;player.z=next.z;
   player.heading=Math.atan2(vx,vz);
 }
 export class WorldSimulation {
   readonly players=new Map<string,SimPlayer>();
   tickNumber=0;
   add(id:string,name:string,x=0,z=0):SimPlayer{
-    const p:SimPlayer={id,name,x:Math.max(-limit,Math.min(limit,x)),z:Math.max(-limit,Math.min(limit,z)),heading:0,dx:0,dz:0,lastSeq:-1};
+    const spawn=safeSpawn(x,z);
+    const p:SimPlayer={id,name,x:spawn.x,z:spawn.z,heading:0,dx:0,dz:0,lastSeq:-1};
     this.players.set(id,p);
     return p;
   }

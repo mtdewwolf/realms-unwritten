@@ -1,5 +1,7 @@
 import {describe,expect,test} from "bun:test";
 import {WorldSimulation,stepMovement,cellKey} from "../apps/server/src/simulation";
+import {overlapsHouse,moveWithCollision,safeSpawn} from "../apps/client/src/world/collision";
+import {settlementsNear} from "../apps/client/src/world/settlements";
 import {validateHello,validateInput,AOI_RADIUS,MOVEMENT_SPEED} from "../apps/server/src/protocol";
 describe("authoritative multiplayer simulation",()=>{
   test("server refuses coordinate teleport packets",()=>{
@@ -36,4 +38,44 @@ describe("authoritative multiplayer simulation",()=>{
     expect(validateInput({type:"input",seq:1,dx:.5,dz:.3})?.type).toBe("input");
     expect(cellKey(-.1,0)).toBe("-1:0");
   });
+});
+
+describe("shared server collision",()=>{
+ test("starter building footprints block walking, including large movement deltas",()=>{
+   expect(overlapsHouse(-6,-5)).toBe(true);
+   expect(overlapsHouse(0,0)).toBe(false);
+   const stopped=moveWithCollision(-10,-5,12,0);
+   expect(stopped.x).toBeLessThan(-7.5);
+   expect(stopped.z).toBe(-5);
+   expect(overlapsHouse(stopped.x,stopped.z)).toBe(false);
+ });
+ test("diagonal movement slides along a wall without entering it",()=>{
+   const moved=moveWithCollision(-10,-5,6,5);
+   expect(overlapsHouse(moved.x,moved.z)).toBe(false);
+   expect(moved.z).toBeGreaterThan(-5);
+   expect(moved.x).toBeGreaterThan(-10);
+ });
+ test("server world ticks cannot walk through starter buildings",()=>{
+   const world=new WorldSimulation();
+   const p=world.add("blocked","Blocked",-10,-5);
+   world.input("blocked",{type:"input",seq:1,dx:1,dz:0});
+   for(let i=0;i<100;i++)world.tick();
+   expect(p.x).toBeLessThan(-7.5);
+   expect(p.z).toBe(-5);
+ });
+ test("legacy collision-embedded login coordinates are recovered",()=>{
+   const fixed=safeSpawn(-6,-5);
+   expect(overlapsHouse(fixed.x,fixed.z)).toBe(false);
+   const world=new WorldSimulation();
+   const p=world.add("recover","Recover",-6,-5);
+   expect(overlapsHouse(p.x,p.z)).toBe(false);
+ });
+ test("generated settlement homes are solid but their roads remain traversable",()=>{
+   // Find the first non-starter settlement near the origin.
+   const town=settlementsNear(0,0,3000).find((x:{id:string})=>x.id!=="settlement-starter");
+   expect(town).toBeDefined();
+   const houseX=town!.x+11;
+   expect(overlapsHouse(houseX,town!.z)).toBe(true);
+   expect(overlapsHouse(town!.x,town!.z)).toBe(false);
+ });
 });
