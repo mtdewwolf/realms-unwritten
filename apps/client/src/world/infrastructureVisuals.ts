@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { ROAD_OFFSET_METERS, settlementsInChunk } from "./settlements";
+import {createFantasyCottage} from "./fantasyArchitecture";
 
 const roadMaterial=new THREE.MeshLambertMaterial({color:0x9c8969,side:THREE.DoubleSide});
 const wood=new THREE.MeshLambertMaterial({color:0x75563d});
@@ -48,13 +49,8 @@ export function addChunkInfrastructure(group:THREE.Group,cx:number,cz:number,chu
     for(let i=0;i<houses;i++){
       const angle=i*Math.PI*2/houses;
       const x=Math.cos(angle)*11,z=Math.sin(angle)*11;
-      const home=new THREE.Mesh(new THREE.BoxGeometry(3,2.6,3),wall);
-      home.position.set(x,1.3,z);
-      village.add(home);
-      const top=new THREE.Mesh(new THREE.ConeGeometry(2.6,1.7,4),roof);
-      top.rotation.y=Math.PI/4;
-      top.position.set(x,3.45,z);
-      village.add(top);
+      village.add(createFantasyCottage(x,z,i));
+
     }
     const post=new THREE.Mesh(new THREE.CylinderGeometry(.2,.25,5,6),wood);
     post.position.y=2.5;

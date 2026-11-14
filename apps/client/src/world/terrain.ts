@@ -44,9 +44,9 @@ export function terrainColorAt(x:number,z:number):[number,number,number] {
   const biome=biomeAt(x,z);
   const height=terrainHeightAt(x,z);
   const palette:Record<Biome,[number,number,number]>={
-    meadow:[0.33,0.48,0.27],
-    woodland:[0.22,0.38,0.27],
-    highlands:[0.44,0.46,0.36],
+    meadow:[0.43,0.53,0.27],
+    woodland:[0.23,0.43,0.27],
+    highlands:[0.52,0.49,0.35],
   };
   const c=palette[biome];
   const shade=0.90+(noise(x,z,34,0x51adeb)-0.5)*0.18 + Math.min(0.15,Math.max(-0.12,height/85));

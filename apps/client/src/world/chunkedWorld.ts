@@ -76,18 +76,19 @@ export class ChunkedWorld {
   private readonly active=new Map<string,{group:THREE.Group;geometry:THREE.BufferGeometry}>();
   private readonly groundMaterial=new THREE.MeshLambertMaterial({vertexColors:true,side:THREE.FrontSide});
   private readonly trunkGeo=new THREE.CylinderGeometry(.2,.3,2.1,6);
-  private readonly foliageGeo=new THREE.ConeGeometry(1.35,3.3,7);
+  private readonly foliageGeo=new THREE.IcosahedronGeometry(1.55,1);
+  private readonly canopyGeo=new THREE.IcosahedronGeometry(1.26,1);
   private readonly stoneGeo=new THREE.DodecahedronGeometry(.8,0);
-  private readonly trunkMat=new THREE.MeshLambertMaterial({color:0x76553a});
+  private readonly trunkMat=new THREE.MeshLambertMaterial({color:0x76553a,flatShading:true});
   private readonly stoneMat=new THREE.MeshLambertMaterial({color:0x91938b,flatShading:true});
   private readonly herbLeafGeo=new THREE.OctahedronGeometry(.55,0);
   private readonly herbLeafMat=new THREE.MeshLambertMaterial({color:0x6fe4a1,flatShading:true});
   private readonly herbCoreGeo=new THREE.OctahedronGeometry(.25,0);
   private readonly herbCoreMat=new THREE.MeshBasicMaterial({color:0xbefbe8});
   private readonly foliageMat=[
-    new THREE.MeshLambertMaterial({color:0x3c6944}),
-    new THREE.MeshLambertMaterial({color:0x667940}),
-    new THREE.MeshLambertMaterial({color:0x356b60})
+    new THREE.MeshLambertMaterial({color:0x406d45,flatShading:true}),
+    new THREE.MeshLambertMaterial({color:0x7c8a40,flatShading:true}),
+    new THREE.MeshLambertMaterial({color:0x38685a,flatShading:true})
   ];
   private center="";
   constructor(private readonly scene:THREE.Scene){}
@@ -100,10 +101,10 @@ export class ChunkedWorld {
     const rng=seededRandom(chunkSeed(cx,cz));
     const dummy=new THREE.Object3D();
     const trunks=new THREE.InstancedMesh(this.trunkGeo,this.trunkMat,20);
-    const crowns=new THREE.InstancedMesh(this.foliageGeo,this.foliageMat[
-      biomeAt(cx*CHUNK_SIZE+32,cz*CHUNK_SIZE+32)==="woodland"?0:
-      biomeAt(cx*CHUNK_SIZE+32,cz*CHUNK_SIZE+32)==="meadow"?1:2
-    ],20);
+    const forestType=biomeAt(cx*CHUNK_SIZE+32,cz*CHUNK_SIZE+32);
+    const color=forestType==="woodland"?0:forestType==="meadow"?1:2;
+    const crowns=new THREE.InstancedMesh(this.foliageGeo,this.foliageMat[color],20);
+    const canopies=new THREE.InstancedMesh(this.canopyGeo,this.foliageMat[(color+1)%3],20);
     for(let i=0;i<20;i++){
       let x=4+rng()*56,z=4+rng()*56;
       let wx=cx*CHUNK_SIZE+x,wz=cz*CHUNK_SIZE+z;
@@ -116,13 +117,17 @@ export class ChunkedWorld {
       dummy.rotation.y=rng()*Math.PI*2;
       dummy.updateMatrix();
       trunks.setMatrixAt(i,dummy.matrix);
-      dummy.position.y=groundHeightAt(wx,wz)+3.15*scale;
-      dummy.updateMatrix();
-      crowns.setMatrixAt(i,dummy.matrix);
+      dummy.position.y=groundHeightAt(wx,wz)+3.55*scale;
+      dummy.scale.set(1.05*scale,1.15*scale,1.05*scale);
+      dummy.updateMatrix();crowns.setMatrixAt(i,dummy.matrix);
+      dummy.position.y=groundHeightAt(wx,wz)+4.65*scale;
+      dummy.scale.set(.82*scale,.78*scale,.82*scale);
+      dummy.updateMatrix();canopies.setMatrixAt(i,dummy.matrix);
     }
     trunks.instanceMatrix.needsUpdate=true;
     crowns.instanceMatrix.needsUpdate=true;
-    group.add(trunks,crowns);
+    canopies.instanceMatrix.needsUpdate=true;
+    group.add(trunks,crowns,canopies);
     const rocks=new THREE.InstancedMesh(this.stoneGeo,this.stoneMat,8);
     for(let i=0;i<8;i++){
       const x=3+rng()*58,z=3+rng()*58;

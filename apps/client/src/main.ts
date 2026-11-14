@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import "./style.css";
 import { populateFrontierProps } from "./world/frontierProps";
+import {createFantasyCottage,decorateVillage} from "./world/fantasyArchitecture";
 import { ChunkedWorld, WORLD_HALF_SIZE, chunkCoordinate, groundHeightAt } from "./world/chunkedWorld";
 import { biomeAt } from "./world/terrain";
 import { landmarksNear, discoverableLandmarks } from "./world/landmarks";
@@ -39,43 +40,22 @@ const canvas = document.querySelector<HTMLCanvasElement>("#game")!;
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: "high-performance" });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 1.4));
 renderer.outputColorSpace = THREE.SRGBColorSpace;
-renderer.setClearColor(0x9dc8d1);
+renderer.setClearColor(0xa4c6be);
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x9dc8d1);
-scene.fog = new THREE.Fog(0x9dc8d1, 33, 85);
+scene.background = new THREE.Color(0xa4c6be);
+scene.fog = new THREE.FogExp2(0xa4c6be,0.009);
 const camera = new THREE.PerspectiveCamera(48, 1, 0.1, 150);
-scene.add(new THREE.HemisphereLight(0xe4f4ff, 0x526e42, 2));
-const sunlight = new THREE.DirectionalLight(0xffeed0, 2.5);
+scene.add(new THREE.HemisphereLight(0xe6ddbd, 0x4c6550, 2.1));
+const sunlight = new THREE.DirectionalLight(0xffd69a, 2.1);
 sunlight.position.set(-8, 16, 11);
 scene.add(sunlight);
 
 const world = new ChunkedWorld(scene);
 world.update(0,0);
 
-function box(w: number, h: number, d: number, color: number) {
-  return new THREE.Mesh(
-    new THREE.BoxGeometry(w, h, d),
-    new THREE.MeshLambertMaterial({ color })
-  );
-}
-function house(x: number, z: number) {
-  const wall = box(3, 2.7, 3, 0xb59d79);
-  wall.position.set(x, 1.35, z);
-  scene.add(wall);
-  const roof = new THREE.Mesh(
-    new THREE.ConeGeometry(2.65, 2.2, 4),
-    new THREE.MeshLambertMaterial({ color: 0x674b3b })
-  );
-  roof.rotation.y = Math.PI / 4;
-  roof.position.set(x, 3.6, z);
-  scene.add(roof);
-  const door = box(0.8, 1.5, 0.07, 0x48352e);
-  door.position.set(x, 0.75, z + 1.53);
-  scene.add(door);
-}
-house(-6, -5);
-house(7, -9);
-house(-7, 7);
+for(const [x,z,style] of [[-6,-5,0],[7,-9,1],[-7,7,2]] as const)
+  scene.add(createFantasyCottage(x,z,style));
+decorateVillage(scene);
 populateFrontierProps(scene);
 
 let adventurer = createRaceCharacter({race:"sunborne",characterClass:"vanguard",appearance:DEFAULT_APPEARANCE});
@@ -373,7 +353,7 @@ abilityButton.addEventListener("click",()=>{
 let previous = performance.now();
 let elapsed = 0;
 function frame(now: number) {
-  if(!app.classList.contains("game-entered")){
+  if(!app!.classList.contains("game-entered")){
     previous=now;
     renderer.render(scene,camera);
     requestAnimationFrame(frame);
