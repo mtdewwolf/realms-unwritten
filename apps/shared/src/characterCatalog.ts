@@ -17,7 +17,19 @@ export const CLASSES={
 export type FactionId=keyof typeof FACTIONS;
 export type RaceId=keyof typeof RACES;
 export type ClassId=keyof typeof CLASSES;
-export interface CharacterIdentity {faction:FactionId;race:RaceId;characterClass:ClassId;name:string}
+export const BODY_FRAMES=["lean","sturdy"] as const;
+export type BodyFrame=typeof BODY_FRAMES[number];
+export interface CharacterAppearance{frame:BodyFrame;skinTone:number;hairStyle:number;hairColor:number;marking:number}
+export const DEFAULT_APPEARANCE:CharacterAppearance={frame:"lean",skinTone:0,hairStyle:0,hairColor:0,marking:0};
+export function parseAppearance(raw:unknown):CharacterAppearance|null{
+ if(!raw||typeof raw!=="object")return null;
+ const a=raw as Record<string,unknown>;
+ if(a.frame!=="lean"&&a.frame!=="sturdy")return null;
+ for(const [key,max] of [["skinTone",3],["hairStyle",3],["hairColor",4],["marking",2]] as const)
+   if(typeof a[key]!=="number"||!Number.isSafeInteger(a[key])||a[key]<0||a[key]>max)return null;
+ return {frame:a.frame,skinTone:a.skinTone as number,hairStyle:a.hairStyle as number,hairColor:a.hairColor as number,marking:a.marking as number};
+}
+export interface CharacterIdentity {appearance:CharacterAppearance;faction:FactionId;race:RaceId;characterClass:ClassId;name:string}
 export interface CharacterCreation extends CharacterIdentity{}
 const own=(o:object,k:string):boolean=>Object.prototype.hasOwnProperty.call(o,k);
 export function parseCharacterCreation(raw:unknown):CharacterCreation|null{
@@ -29,6 +41,8 @@ export function parseCharacterCreation(raw:unknown):CharacterCreation|null{
   if(!own(FACTIONS,r.faction)||!own(RACES,r.race)||!own(CLASSES,r.characterClass))return null;
   const faction=r.faction as FactionId,race=r.race as RaceId,characterClass=r.characterClass as ClassId;
   if(RACES[race].faction!==faction)return null;
-  return {name,faction,race,characterClass};
+  const appearance=r.appearance===undefined?{...DEFAULT_APPEARANCE}:parseAppearance(r.appearance);
+  if(!appearance)return null;
+  return {name,faction,race,characterClass,appearance};
 }
-export const LEGACY_IDENTITY:CharacterIdentity={name:"Adventurer",faction:"radiant-accord",race:"sunborne",characterClass:"vanguard"};
+export const LEGACY_IDENTITY:CharacterIdentity={name:"Adventurer",faction:"radiant-accord",race:"sunborne",characterClass:"vanguard",appearance:{...DEFAULT_APPEARANCE}};

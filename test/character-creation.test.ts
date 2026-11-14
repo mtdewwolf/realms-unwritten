@@ -1,6 +1,6 @@
 import {describe,expect,test} from "bun:test";
 import {Database} from "bun:sqlite";
-import {parseCharacterCreation,FACTIONS,RACES,CLASSES} from "../apps/shared/src/characterCatalog";
+import {parseCharacterCreation,FACTIONS,RACES,CLASSES,DEFAULT_APPEARANCE} from "../apps/shared/src/characterCatalog";
 import {CharacterIdentityStore} from "../apps/server/src/characterIdentity";
 function selection(faction:string,race:string,characterClass:string,name="Aster Vale"):unknown{
  return {type:"create_character",name,faction,race,characterClass};
@@ -45,7 +45,7 @@ describe("saved character identity",()=>{
  test("legacy migration keeps existing name and is idempotent",()=>{
   const {db,store}=fixture();
   store.migrateLegacy("legacy");store.migrateLegacy("legacy");
-  expect(store.read("legacy")).toEqual({name:"Legacy Traveler",faction:"radiant-accord",race:"sunborne",characterClass:"vanguard"});
+  expect(store.read("legacy")).toEqual({name:"Legacy Traveler",faction:"radiant-accord",race:"sunborne",characterClass:"vanguard",appearance:DEFAULT_APPEARANCE});
   db.close();
  });
  test("missing character cannot receive an identity",()=>{
