@@ -1,10 +1,13 @@
-import {FACTIONS,RACES,CLASSES,type CharacterCreation,type FactionId,type RaceId,type ClassId} from "../../../shared/src/characterCatalog";
+import {FACTIONS,RACES,CLASSES,type CharacterCreation,type FactionId,type RaceId,type ClassId,type CharacterAppearance} from "../../../shared/src/characterCatalog";
+import {RacePreview} from "./racePreview";
 
 export class CharacterCreator{
  readonly element:HTMLElement;
  private faction:FactionId="radiant-accord";
  private race:RaceId="sunborne";
  private characterClass:ClassId="vanguard";
+ private appearance:CharacterAppearance={frame:"lean",skinTone:0,hairStyle:0,hairColor:0,marking:0};
+ private readonly preview:RacePreview;
  private readonly choices:HTMLElement;
  private readonly display:HTMLElement;
  private readonly message:HTMLElement;
@@ -12,16 +15,19 @@ export class CharacterCreator{
  constructor(host:HTMLElement,private readonly submit:(choice:CharacterCreation)=>boolean){
   const el=document.createElement("section");
   el.id="character-creator";el.hidden=true;el.setAttribute("aria-label","Create your character");
-  el.innerHTML='<div class="creator-header"><strong>REALMS UNWRITTEN</strong><small>FORGE YOUR LEGEND</small></div><h2>Choose your allegiance</h2><p class="creator-intro">The Radiant Accord stands for protection. The Umbral Dominion seeks power through darkness. Your character can challenge the beliefs of their faction.</p><div id="creator-factions"></div><div class="creator-preview"><div id="creator-portrait" aria-hidden="true"><div class="portrait-head"></div><div class="portrait-body"></div></div><div id="creator-display"></div></div><h3>Heritage</h3><div id="creator-races"></div><h3>Calling</h3><div id="creator-classes"></div><label for="creator-name">Character name</label><input id="creator-name" maxlength="20" autocomplete="off" placeholder="3–20 characters"/><p class="creator-message" role="status"></p><button type="button" id="creator-submit">ENTER THE REALM</button><p class="creator-footnote">Faction, race and class are permanent on this guest character. Combat skills and faction territories are future milestones.</p>';
+  el.innerHTML='<div class="creator-header"><strong>REALMS UNWRITTEN</strong><small>FORGE YOUR LEGEND</small></div><h2>Choose your allegiance</h2><p class="creator-intro">The Radiant Accord stands for protection. The Umbral Dominion seeks power through darkness. Your character can challenge the beliefs of their faction.</p><div id="creator-factions"></div><div class="creator-preview"><div id="creator-portrait" aria-label="Live 3D character preview"></div><div id="creator-display"></div></div><div id="creator-rotate"><button type="button" id="creator-left">↶</button><span>Drag to rotate</span><button type="button" id="creator-right">↷</button></div><h3>Heritage</h3><div id="creator-races"></div><h3>Calling</h3><div id="creator-classes"></div><h3>Appearance</h3><div id="creator-appearance"></div><label for="creator-name">Character name</label><input id="creator-name" maxlength="20" autocomplete="off" placeholder="3–20 characters"/><p class="creator-message" role="status"></p><button type="button" id="creator-submit">ENTER THE REALM</button><p class="creator-footnote">Faction, race and class are permanent on this guest character. Appearance is saved on Bun. Faction homelands and talents are future milestones.</p>';
   host.appendChild(el);this.element=el;
   this.choices=el.querySelector<HTMLElement>("#creator-factions")!;
   this.display=el.querySelector<HTMLElement>("#creator-display")!;
   this.message=el.querySelector<HTMLElement>(".creator-message")!;
   this.name=el.querySelector<HTMLInputElement>("#creator-name")!;
+  this.preview=new RacePreview(el.querySelector<HTMLElement>("#creator-portrait")!);
+  el.querySelector("#creator-left")!.addEventListener("click",()=>this.preview.rotate(-Math.PI/6));
+  el.querySelector("#creator-right")!.addEventListener("click",()=>this.preview.rotate(Math.PI/6));
   el.querySelector<HTMLButtonElement>("#creator-submit")!.addEventListener("click",()=>{
     const value=this.name.value.trim();
     if(value.length<3||value.length>20){this.error("Name must be 3–20 characters");return;}
-    const ok=this.submit({name:value,faction:this.faction,race:this.race,characterClass:this.characterClass});
+    const ok=this.submit({name:value,faction:this.faction,race:this.race,characterClass:this.characterClass,appearance:{...this.appearance}});
     if(!ok)this.error("Connect to the game server before creating a character");
     else this.error("Creating your character…");
   });
@@ -59,6 +65,31 @@ export class CharacterCreator{
      const description=document.createElement("small");description.textContent=CLASSES[key].description;
      button.append(title,description);button.addEventListener("click",()=>{this.characterClass=key;this.render();});classes.appendChild(button);
    }
+   const appearancePanel=this.element.querySelector<HTMLElement>("#creator-appearance")!;
+   appearancePanel.replaceChildren();
+   const selections=[
+     {key:"frame" as const,title:"Build",names:["Lean","Sturdy"]},
+     {key:"skinTone" as const,title:"Skin tone",names:["I","II","III","IV"]},
+     {key:"hairStyle" as const,title:"Hairstyle",names:["Cropped","Long","Spiked","Braided"]},
+     {key:"hairColor" as const,title:"Hair color",names:["Midnight","Gold","Ivory","Auburn","Violet"]},
+     {key:"marking" as const,title:"Markings",names:["None","Runic","Warpaint"]}
+   ];
+   for(const setting of selections){
+     const label=document.createElement("label");label.textContent=setting.title;
+     const select=document.createElement("select");select.setAttribute("aria-label",setting.title);
+     setting.names.forEach((value,index)=>{
+       const option=document.createElement("option");
+       option.value=String(index);option.textContent=value;select.appendChild(option);
+     });
+     select.value=String(setting.key==="frame"?(this.appearance.frame==="lean"?0:1):this.appearance[setting.key]);
+     select.addEventListener("change",()=>{
+       const value=Number(select.value);
+       this.appearance={...this.appearance,[setting.key]:setting.key==="frame"?(value===0?"lean":"sturdy"):value};
+       this.preview.update(this.race,this.characterClass,this.appearance);
+     });
+     label.appendChild(select);appearancePanel.appendChild(label);
+   }
+   this.preview.update(this.race,this.characterClass,this.appearance);
    this.display.textContent=RACES[this.race].name+" · "+CLASSES[this.characterClass].name;
    this.element.style.setProperty("--creator-accent",RACES[this.race].color);
  }

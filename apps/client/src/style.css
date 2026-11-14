@@ -160,3 +160,12 @@
 .creator-message{color:#f4c488;min-height:15px}
 .creator-footnote{font-size:11px;color:#b9c7bb;line-height:1.5;max-width:600px}
 @media(min-width:900px){#character-creator{padding-left:max(7vw,24px)}}
+
+#character-creator .creator-preview{align-items:center;gap:13px;flex-wrap:wrap}
+#character-creator #creator-portrait{width:260px;height:290px;max-width:100%;flex:none;background:radial-gradient(ellipse at center,#405749 0%,#192c2b 72%);border:1px solid #8ba799;border-radius:15px;filter:none;overflow:hidden}
+#character-creator #creator-portrait canvas{display:block;width:100%;height:100%;touch-action:none}
+#character-creator #creator-rotate{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+#character-creator #creator-rotate button{min-height:44px;min-width:44px;background:#27453f;color:white;border:1px solid #95ae9c;border-radius:10px;touch-action:manipulation}
+#character-creator #creator-appearance{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:9px;max-width:760px}
+#character-creator #creator-appearance label{display:flex;flex-direction:column;gap:5px;margin:0}
+#character-creator #creator-appearance select{width:100%;min-height:44px;padding:8px;background:#182e2b;color:white;border:1px solid #8fae9d;border-radius:9px}
