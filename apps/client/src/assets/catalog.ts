@@ -14,6 +14,10 @@ export interface AssetDefinition {
   gameplayCollision: boolean;
 }
 export const assetCatalog: readonly AssetDefinition[] = [
+  { id:"environment/fantasy-sky-01",category:"environment",stage:"procedural",lod0Triangles:576,textureMaxPx:64,variants:1,gameplayCollision:false },
+  { id:"environment/biome-flora-01",category:"environment",stage:"procedural",lod0Triangles:500,textureMaxPx:128,variants:6,gameplayCollision:false },
+  { id:"building/accord-watch-01",category:"building",stage:"procedural",lod0Triangles:6500,textureMaxPx:1024,variants:1,gameplayCollision:true },
+  { id:"building/dominion-spire-01",category:"building",stage:"procedural",lod0Triangles:6500,textureMaxPx:1024,variants:1,gameplayCollision:true },
   { id: "env/tree-pine-01", category: "environment", stage: "procedural", lod0Triangles: 500, textureMaxPx: 512, variants: 3, gameplayCollision: true },
   { id: "env/rock-cluster-01", category: "environment", stage: "procedural", lod0Triangles: 400, textureMaxPx: 512, variants: 3, gameplayCollision: true },
   { id: "prop/market-stall-01", category: "prop", stage: "procedural", lod0Triangles: 1000, textureMaxPx: 512, variants: 3, gameplayCollision: true },
@@ -22,6 +26,15 @@ export const assetCatalog: readonly AssetDefinition[] = [
   { id: "prop/flower-patch-01", category: "prop", stage: "procedural", lod0Triangles: 100, textureMaxPx: 256, variants: 4, gameplayCollision: false },
   { id: "building/cottage-01", category: "building", stage: "blockout", lod0Triangles: 3000, textureMaxPx: 1024, variants: 3, gameplayCollision: true },
   { id: "character/adventurer-01", category: "character", stage: "blockout", lod0Triangles: 7500, textureMaxPx: 1024, variants: 4, gameplayCollision: true },
+  // CI-generated original character GLBs; high-level target budgets, not measured counts.
+  ...(["sunborne","thornkin","ashforged","veilkin"] as const).flatMap(race=>
+    (["vanguard","spellweaver","shadeblade"] as const).map(characterClass=>({
+      id:"character/"+race+"-"+characterClass,
+      category:"character" as const,
+      stage:"procedural" as const,
+      lod0Triangles:8000,textureMaxPx:1024,variants:4,
+      gameplayCollision:true
+    }))),
   { id: "creature/wolf-01", category: "creature", stage: "blockout", lod0Triangles: 4500, textureMaxPx: 1024, variants: 2, gameplayCollision: true },
   { id: "vfx/sword-swipe-01", category: "vfx", stage: "planned", lod0Triangles: 120, textureMaxPx: 256, variants: 2, gameplayCollision: false },
   { id: "ui/ability-icons-01", category: "ui", stage: "planned", lod0Triangles: 0, textureMaxPx: 256, variants: 8, gameplayCollision: false },

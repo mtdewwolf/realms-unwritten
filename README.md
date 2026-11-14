@@ -301,6 +301,14 @@ Three class-specific starter abilities are now server authoritative: **Vanguard 
 
 The starter graphical rebuild replaces cube houses with original layered-roof, timber-framed fantasy cottages, painted-style procedural slate/wood/stone/plaster textures, richer tree canopies, warmer lighting and distinct 3D race-creator stages. This is **visual rebuild pass 1**, not a complete WoW-quality asset set or a Warcraft asset port. See [Visual Rebuild & Entry Flow](docs/VISUAL_REBUILD_V1.md) for exactly what has and has not been built.
 
+### Graphical rebuild pass 2 — animated race models and faction environments
+
+The Android build now generates **12 original rigged GLBs** (four playable races × three starting classes) with idle, walk, attack, dodge, cast and death clips. The Three.js client uses a shared skeleton-safe animation loader for local heroes, nearby players and the creation preview, preserves selected body build, skin/hair colors, hairstyles and markings, and falls back to the existing procedural avatar if an asset fails to load. CI validates all 12 GLBs before packaging the APK.
+
+The visible world additionally contains **two different faction architectural enclaves** near Verdant Reach (Radiant Accord and Umbral Dominion), with corresponding server-authoritative house collisions. A mobile-oriented painted gradient sky, sunlight/fog cycle and character contact shadow bring atmosphere to the environment. These new assets supplement the existing painted cottages, ground, biome foliage and other environmental props.
+
+**Scope disclaimer:** This is a substantial graphical rebuild, not a complete production art overhaul. Authored high-fidelity faces, hair physics, complex clothing, large faction homelands, hand-authored dungeons, full UI/icon/audio art, and physical Android screenshot/FPS approval remain open. See [Graphical Rebuild Pass 2](docs/GRAPHICAL_REBUILD_PASS_2.md).
+
 ### Guest persistence
 
 - SQLite via Bun's `bun:sqlite`.
