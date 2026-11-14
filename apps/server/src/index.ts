@@ -11,6 +11,7 @@ import {ProgressionStore} from "./progression";
 import {ResourceService} from "./resources";
 import {WolfRewardCoordinator} from "./wolfRewards";
 import {CharacterIdentityStore} from "./characterIdentity";
+import {AccountStore} from "./accounts";
 import {parseCharacterCreation} from "../../shared/src/characterCatalog";
 import {PROTOCOL_VERSION,SIMULATION_HZ,SNAPSHOT_HZ,validateHello,type ServerMessage} from "./protocol";
 
@@ -26,6 +27,7 @@ const saveCharacter=db.query("UPDATE characters SET x=?,z=?,updated_at=? WHERE i
 const world=new WorldSimulation();
 const combat=new CombatSimulation(world);
 const identityStore=new CharacterIdentityStore(db);
+const accounts=new AccountStore(db);
 const inventory=new InventoryStore(db);
 const progression=new ProgressionStore(db);
 const quests=new QuestStore(db,progression,inventory);
@@ -33,7 +35,7 @@ const resources=new ResourceService(db,inventory);
 const wolfRewards=new WolfRewardCoordinator(db,inventory,quests,progression);
 combat.resolveAttackDamage=id=>20+Math.floor((progression.read(id).attributes.strength-5)/2)+inventory.equipped(id).bonusDamage;
 combat.resolveClass=id=>identityStore.read(id)?.characterClass??null;
-type Session={playerId:string|null; token:string|null; lastInputAt:number;messages:number; windowStart:number};
+type Session={playerId:string|null;token:string|null;accountId:string|null;accountToken:string|null;authAttempts:number;lastInputAt:number;messages:number;windowStart:number};
 const socketByPlayer=new Map<string,ServerWebSocket<Session>>();
 const hash=(token:string)=>createHash("sha256").update(token).digest("hex");
 combat.onWolfDefeated=(eventId,contributors)=>{
@@ -65,6 +67,15 @@ function disconnect(ws:ServerWebSocket<Session>):void{
   combat.leave(id);
   ws.data.playerId=null;
 }
+function enterWorld(ws:ServerWebSocket<Session>,stored:Stored,token:string):void{
+  const previous=socketByPlayer.get(stored.id);
+  if(previous){disconnect(previous);previous.close(4002,"Session resumed elsewhere");}
+  ws.data.playerId=stored.id;ws.data.token=token;
+  const player=world.add(stored.id,stored.name,stored.x,stored.z);
+  combat.join(stored.id);socketByPlayer.set(stored.id,ws);
+  send(ws,{type:"welcome",protocol:PROTOCOL_VERSION,id:stored.id,token,player:view(player),character:identityStore.read(stored.id)!});
+  send(ws,inventory.read(stored.id));send(ws,quests.status(stored.id));send(ws,progression.read(stored.id));
+}
 const server=Bun.serve<Session>({
   hostname:process.env.HOST||"0.0.0.0",
   port:Number(process.env.PORT||3001),
@@ -73,7 +84,7 @@ const server=Bun.serve<Session>({
     if(url.pathname==="/health")return Response.json({ok:true,game:"realms-unwritten",protocol:PROTOCOL_VERSION,players:world.players.size,wolfHealth:combat.wolf.health});
     if(url.pathname==="/ws"){
       // A public deployment must implement TLS, origin policy, auth and rate limiting at the edge.
-      const ok=server.upgrade(req,{data:{playerId:null,token:null,lastInputAt:Date.now(),messages:0,windowStart:Date.now()}});
+      const ok=server.upgrade(req,{data:{playerId:null,token:null,accountId:null,accountToken:null,authAttempts:0,lastInputAt:Date.now(),messages:0,windowStart:Date.now()}});
       return ok?undefined:new Response("WebSocket upgrade required",{status:426});
     }
     return new Response("Realms Unwritten authoritative movement prototype");
@@ -82,7 +93,7 @@ const server=Bun.serve<Session>({
     maxPayloadLength:2048,
     idleTimeout:90,
     open(ws){send(ws,{type:"error",message:"Send hello to join the world"});},
-    message(ws,message){
+    async message(ws,message){
       if(typeof message!=="string"||message.length>2048){ws.close(1009,"Invalid message");return;}
       const now=Date.now();
       if(now-ws.data.windowStart>=1000){ws.data.windowStart=now;ws.data.messages=0;}
@@ -91,15 +102,46 @@ const server=Bun.serve<Session>({
       try{packet=JSON.parse(message);}catch{return;}
       if(!ws.data.playerId){
         const kind=(packet as {type?:unknown})?.type;
+        if(kind==="account_register"||kind==="account_login"){
+          if(ws.data.accountId||++ws.data.authAttempts>5){send(ws,{type:"auth_result",ok:false,reason:"Too many attempts or already authenticated"});return;}
+          const value=packet as {username?:unknown;password?:unknown};
+          const result=kind==="account_register"
+            ?await accounts.register(value.username,value.password)
+            :await accounts.login(value.username,value.password);
+          if(ws.readyState!==1)return;
+          if(!result){send(ws,{type:"auth_result",ok:false,reason:"Registration unavailable or invalid credentials"});return;}
+          ws.data.accountId=result.id;ws.data.accountToken=result.token;
+          const saved=accounts.character(result.id);
+          send(ws,{type:"account_ready",token:result.token,hasCharacter:!!saved});
+          if(saved)enterWorld(ws,saved,result.token);
+          else send(ws,{type:"creation_required"});
+          return;
+        }
+        if(kind==="hello"&&typeof (packet as {accountToken?:unknown}).accountToken==="string"){
+          const accountToken=(packet as {accountToken:string}).accountToken;
+          const accountId=accounts.resume(accountToken);
+          if(!accountId){send(ws,{type:"auth_required"});return;}
+          ws.data.accountId=accountId;ws.data.accountToken=accountToken;
+          const saved=accounts.character(accountId);
+          send(ws,{type:"account_ready",token:accountToken,hasCharacter:!!saved});
+          if(saved)enterWorld(ws,saved,accountToken);
+          else send(ws,{type:"creation_required"});
+          return;
+        }
+        if(kind==="hello"&&(packet as {accountToken?:unknown}).accountToken===undefined
+          &&(packet as {mode?:unknown}).mode==="account"){send(ws,{type:"auth_required"});return;}
         let stored:Stored;
         let token:string;
         if(kind==="create_character"){
           const created=parseCharacterCreation(packet);
           if(!created){send(ws,{type:"creation_result",ok:false,reason:"Invalid name, faction, race or class"});return;}
-          token=randomBytes(32).toString("base64url");
+          if(ws.data.accountId&&accounts.character(ws.data.accountId)){send(ws,{type:"creation_result",ok:false,reason:"Account already has a character"});return;}
+          const characterToken=randomBytes(32).toString("base64url");
+          token=ws.data.accountToken??characterToken;
           const id=randomUUID();
           const createTx=db.transaction(()=>{
-            insertCharacter.run(id,hash(token),created.name,0,0,Date.now());
+            insertCharacter.run(id,hash(characterToken),created.name,0,0,Date.now());
+            if(ws.data.accountId)accounts.linkCharacter(id,ws.data.accountId);
             identityStore.assign(id,created);
           });
           createTx();
@@ -115,20 +157,7 @@ const server=Bun.serve<Session>({
           // Existing pre-creation guest characters keep their identity and progress.
           identityStore.migrateLegacy(stored.id);
         }
-        const previous=socketByPlayer.get(stored.id);
-        if(previous){
-          disconnect(previous);
-          previous.close(4002,"Session resumed elsewhere");
-          stored=fetchCharacter.get(hash(token))!;
-        }
-        ws.data.playerId=stored.id;ws.data.token=token;
-        const player=world.add(stored.id,stored.name,stored.x,stored.z);
-        combat.join(stored.id);
-        socketByPlayer.set(stored.id,ws);
-        send(ws,{type:"welcome",protocol:PROTOCOL_VERSION,id:stored.id,token,player:view(player),character:identityStore.read(stored.id)!});
-        send(ws,inventory.read(stored.id));
-        send(ws,quests.status(stored.id));
-        send(ws,progression.read(stored.id));
+        enterWorld(ws,stored,token);
         return;
       }
       if((packet as {type?:unknown})?.type==="quest"){
