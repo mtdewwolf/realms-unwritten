@@ -69,7 +69,12 @@ function disconnect(ws:ServerWebSocket<Session>):void{
 }
 function enterWorld(ws:ServerWebSocket<Session>,stored:Stored,token:string):void{
   const previous=socketByPlayer.get(stored.id);
-  if(previous){disconnect(previous);previous.close(4002,"Session resumed elsewhere");}
+  if(previous){
+    disconnect(previous);
+    previous.close(4002,"Session resumed elsewhere");
+    const latest=ws.data.accountId?accounts.character(ws.data.accountId):fetchCharacter.get(hash(token));
+    if(latest)stored=latest; // Re-read after the old authoritative position is saved.
+  }
   ws.data.playerId=stored.id;ws.data.token=token;
   const player=world.add(stored.id,stored.name,stored.x,stored.z);
   combat.join(stored.id);socketByPlayer.set(stored.id,ws);
