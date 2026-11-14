@@ -3,6 +3,7 @@ import "./style.css";
 import { populateFrontierProps } from "./world/frontierProps";
 import {createFantasyCottage,decorateVillage} from "./world/fantasyArchitecture";
 import {decorateFactionOutposts} from "./world/factionOutposts";
+import {WorldAtmosphere} from "./world/worldAtmosphere";
 import { ChunkedWorld, WORLD_HALF_SIZE, chunkCoordinate, groundHeightAt } from "./world/chunkedWorld";
 import { biomeAt } from "./world/terrain";
 import { landmarksNear, discoverableLandmarks } from "./world/landmarks";
@@ -51,6 +52,7 @@ scene.add(new THREE.HemisphereLight(0xe6ddbd, 0x4c6550, 2.1));
 const sunlight = new THREE.DirectionalLight(0xffd69a, 2.1);
 sunlight.position.set(-8, 16, 11);
 scene.add(sunlight);
+const atmosphere=new WorldAtmosphere(scene,sunlight);
 
 const world = new ChunkedWorld(scene);
 world.update(0,0);
@@ -501,6 +503,7 @@ function frame(now: number) {
   ).multiplyScalar(distance);
   camera.position.copy(avatar.position).add(offset);
   camera.lookAt(avatar.position.x, 1, avatar.position.z);
+  atmosphere.update(camera,avatar.position,elapsed);
   const width = window.innerWidth, height = window.innerHeight;
   if (canvas.width !== Math.round(width * renderer.getPixelRatio()) ||
       canvas.height !== Math.round(height * renderer.getPixelRatio())) {
