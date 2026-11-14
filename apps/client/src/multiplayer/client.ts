@@ -139,7 +139,6 @@ export class MultiplayerClient {
     this.status("Connection lost · reconnecting "+this.retries+"/"+MAX_RECONNECT_ATTEMPTS);
     this.retryTimer=setTimeout(()=>{this.retryTimer=null;this.openSocket();},delay);
   }
-  }
   sendQuest(action:"status"|"accept"|"turnin"):boolean{
     if(!this.connected)return false;
     this.socket!.send(JSON.stringify({type:"quest",action,id:"verdant-wolf-hunt"}));

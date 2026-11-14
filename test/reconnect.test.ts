@@ -13,7 +13,7 @@ describe("bounded reconnect policy",()=>{
   expect(shouldReconnect(1006,0,false)).toBe(false);
  });
  test("authentication, policy and protocol closures stop retrying",()=>{
-  for(const code of [1000,1008,1009,1011,4001,4003,4004])
+  for(const code of [1000,1008,1009,1011,4001,4002,4003,4004])
    expect(shouldReconnect(code,0,true)).toBe(false);
  });
 });

@@ -8,5 +8,5 @@ export function reconnectDelay(attempt:number):number{
 export function shouldReconnect(closeCode:number,attempt:number,enabled:boolean):boolean{
   if(!enabled||attempt>=MAX_RECONNECT_ATTEMPTS)return false;
   // Normal, going-away, auth/policy, invalid packet and application-incompatible errors.
-  return ![1000,1008,1009,1011,4001,4003,4004].includes(closeCode);
+  return ![1000,1008,1009,1011,4001,4002,4003,4004].includes(closeCode);
 }
