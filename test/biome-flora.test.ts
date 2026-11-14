@@ -1,5 +1,6 @@
 import {describe,expect,test} from "bun:test";
 import {floraInChunk,addBiomeFlora} from "../apps/client/src/world/biomeFlora";
+import {createRaceCharacter} from "../apps/client/src/characters/raceModel";
 describe("Android-friendly biome environment assets",()=>{
  test("flora generation is deterministic per chunk and avoids starter village",()=>{
   const first=floraInChunk(0,0),second=floraInChunk(0,0);
@@ -9,7 +10,8 @@ describe("Android-friendly biome environment assets",()=>{
   expect(new Set(floraInChunk(2,3).map(p=>p.kind)).size).toBeGreaterThan(2);
  });
  test("builds grouped instanced vegetation without individual scene draw calls",()=>{
-  const group=new THREE.Group();
+  const model=createRaceCharacter({race:"sunborne",characterClass:"vanguard"});
+  const group=model.root;group.clear();
   addBiomeFlora(group,2,3,64,()=>2);
   expect(group.children.length).toBeLessThanOrEqual(6);
   expect(group.children.length).toBeGreaterThan(0);
@@ -21,5 +23,6 @@ describe("Android-friendly biome environment assets",()=>{
    expect(batch.geometry.groups.length).toBeGreaterThan(0);
   }
   expect(count).toBeGreaterThan(30);
+  model.dispose();
  });
 });
