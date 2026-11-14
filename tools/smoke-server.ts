@@ -170,6 +170,53 @@ async function run(){
   restoredSocket.send(JSON.stringify({type:"inventory"}));
   if((await inventoryAfter).coins!==bag.coins)throw Error("Reconnect lost inventory");
   // Replaying an existing token on another device must take over, not mint a second session.
+  // End-to-end registered-account path, which the Android entry screen now uses.
+  let accountToken="";
+  const registeredSocket=new WebSocket("ws://127.0.0.1:"+port+"/ws");
+  sockets.push(registeredSocket);
+  const registered=await new Promise<any>((resolve,reject)=>{
+    const timer=setTimeout(()=>reject(Error("Account registration/character creation timed out")),6000);
+    registeredSocket.addEventListener("error",()=>{clearTimeout(timer);reject(Error("Account socket error"));});
+    registeredSocket.addEventListener("open",()=>registeredSocket.send(JSON.stringify({type:"hello",mode:"account"})));
+    registeredSocket.addEventListener("message",event=>{
+      const packet=JSON.parse(String(event.data));
+      if(packet.type==="auth_required")registeredSocket.send(JSON.stringify({type:"account_register",username:"SmokeAccount",password:"unique-smoke-password-123"}));
+      if(packet.type==="auth_result"){clearTimeout(timer);reject(Error("Account registration failed: "+packet.reason));}
+      if(packet.type==="account_ready")accountToken=packet.token;
+      if(packet.type==="creation_required")registeredSocket.send(JSON.stringify({type:"create_character",name:"Thorn Hero",faction:"radiant-accord",race:"thornkin",characterClass:"spellweaver"}));
+      if(packet.type==="welcome"){clearTimeout(timer);resolve(packet);}
+    });
+  });
+  if(!accountToken||registered.character.race!=="thornkin"||registered.character.characterClass!=="spellweaver")
+    throw Error("Account creation did not lead to a persisted custom character");
+  const accountResumeSocket=new WebSocket("ws://127.0.0.1:"+port+"/ws");
+  sockets.push(accountResumeSocket);
+  const accountResume=await new Promise<any>((resolve,reject)=>{
+    const timer=setTimeout(()=>reject(Error("Account session resume timed out")),4500);
+    accountResumeSocket.addEventListener("open",()=>accountResumeSocket.send(JSON.stringify({type:"hello",mode:"account",accountToken})));
+    accountResumeSocket.addEventListener("message",event=>{
+      const packet=JSON.parse(String(event.data));
+      if(packet.type==="auth_required"){clearTimeout(timer);reject(Error("Persisted account session rejected"));}
+      if(packet.type==="welcome"){clearTimeout(timer);resolve(packet);}
+    });
+  });
+  if(accountResume.id!==registered.id)throw Error("Account resumed into another character");
+  // Password sign-in must work even when no session token is supplied.
+  const loginSocket=new WebSocket("ws://127.0.0.1:"+port+"/ws");
+  sockets.push(loginSocket);
+  const login=await new Promise<any>((resolve,reject)=>{
+    const timer=setTimeout(()=>reject(Error("Password login timed out")),6000);
+    loginSocket.addEventListener("open",()=>loginSocket.send(JSON.stringify({type:"hello",mode:"account"})));
+    loginSocket.addEventListener("message",event=>{
+      const packet=JSON.parse(String(event.data));
+      if(packet.type==="auth_required")loginSocket.send(JSON.stringify({type:"account_login",username:"smokeaccount",password:"unique-smoke-password-123"}));
+      if(packet.type==="auth_result"){clearTimeout(timer);reject(Error("Password login failed: "+packet.reason));}
+      if(packet.type==="welcome"){clearTimeout(timer);resolve(packet);}
+    });
+  });
+  if(login.id!==registered.id||JSON.stringify(login.character)!==JSON.stringify(registered.character))
+    throw Error("Password sign-in did not restore saved character appearance and identity");
+  console.log("PASS account flow: register, create character, resume session and password sign-in");
   console.log("PASS guest reconnect: same identity, saved position, single active session and inventory");
   console.log("PASS multiplayer smoke: shared combat, quest, equipment and rejected forged gathering/crafting");
 }
