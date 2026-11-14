@@ -223,7 +223,7 @@ const broadcast=setInterval(()=>{
   for(const [id,ws] of socketByPlayer){
     const snapshot=world.snapshot(id);
     const vitals=combat.vital(id);
-    if(snapshot&&vitals)send(ws,{...snapshot,others:snapshot.others.map(other=>({...other,character:identityStore.read(other.id)})),vitals,wolf:Math.hypot(snapshot.you.x-combat.wolf.x,snapshot.you.z-combat.wolf.z)<=160?combat.wolfView():null});
+    if(snapshot&&vitals)send(ws,{...snapshot,others:snapshot.others.map(other=>({...other,character:identityStore.read(other.id)??undefined})),vitals,wolf:Math.hypot(snapshot.you.x-combat.wolf.x,snapshot.you.z-combat.wolf.z)<=160?combat.wolfView():null});
   }
 },1000/SNAPSHOT_HZ);
 const persistence=setInterval(()=>{
