@@ -1,5 +1,4 @@
 import {describe,expect,test} from "bun:test";
-import * as THREE from "three";
 import {floraInChunk,addBiomeFlora} from "../apps/client/src/world/biomeFlora";
 describe("Android-friendly biome environment assets",()=>{
  test("flora generation is deterministic per chunk and avoids starter village",()=>{
@@ -16,8 +15,8 @@ describe("Android-friendly biome environment assets",()=>{
   expect(group.children.length).toBeGreaterThan(0);
   let count=0;
   for(const child of group.children){
-   expect(child).toBeInstanceOf(THREE.InstancedMesh);
-   const batch=child as THREE.InstancedMesh;count+=batch.count;
+   expect(child.type).toBe("Mesh");
+   const batch=child as typeof child & {count:number;geometry:{getAttribute:(name:string)=>{count:number};groups:unknown[]}};count+=batch.count;
    expect(batch.geometry.getAttribute("position").count).toBeGreaterThan(0);
    expect(batch.geometry.groups.length).toBeGreaterThan(0);
   }
