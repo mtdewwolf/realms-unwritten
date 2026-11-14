@@ -32,6 +32,7 @@ const quests=new QuestStore(db,progression,inventory);
 const resources=new ResourceService(db,inventory);
 const wolfRewards=new WolfRewardCoordinator(db,inventory,quests,progression);
 combat.resolveAttackDamage=id=>20+Math.floor((progression.read(id).attributes.strength-5)/2)+inventory.equipped(id).bonusDamage;
+combat.resolveClass=id=>identityStore.read(id)?.characterClass??null;
 type Session={playerId:string|null; token:string|null; lastInputAt:number;messages:number; windowStart:number};
 const socketByPlayer=new Map<string,ServerWebSocket<Session>>();
 const hash=(token:string)=>createHash("sha256").update(token).digest("hex");
@@ -190,6 +191,11 @@ const server=Bun.serve<Session>({
       }
       if((packet as {type?:unknown})?.type==="inventory"){
         send(ws,inventory.read(ws.data.playerId));
+        return;
+      }
+      if((packet as {type?:unknown})?.type==="ability"){
+        const result=combat.useAbility(ws.data.playerId,packet);
+        if(result)send(ws,result);
         return;
       }
       if((packet as {type?:unknown})?.type==="action"){

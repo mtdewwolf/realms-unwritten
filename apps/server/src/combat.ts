@@ -1,6 +1,7 @@
 import {randomUUID} from "node:crypto";
 /** Deterministic server-owned starter wolf encounter; no client health or coordinates accepted. */
 import type {WorldSimulation,SimPlayer} from "./simulation";
+import type {ClassId} from "../../shared/src/characterCatalog";
 
 export const WOLF_ID="starter-wolf-v1";
 export const MAX_HEALTH=100;
@@ -13,6 +14,10 @@ export const BITE_DAMAGE=12;
 export const ATTACK_RANGE=3.25;
 export const TICK_SECONDS=0.05;
 export type CombatAction="attack"|"dodge";
+export type ClassAbility="bulwark"|"arc-bolt"|"quickstrike";
+export interface AbilityPacket{type:"ability";seq:number;ability:ClassAbility;damage?:never}
+export interface AbilityResult{type:"ability_result";seq:number;ability:ClassAbility;ok:boolean;reason?:string;wolfHealth:number;health:number;stamina:number;cooldownSeconds:number}
+export const CLASS_ABILITY:Record<ClassId,ClassAbility>={vanguard:"bulwark",spellweaver:"arc-bolt",shadeblade:"quickstrike"};
 export interface ActionPacket {type:"action";seq:number;action:CombatAction;target?:string}
 export type WolfPhase="idle"|"chase"|"windup"|"strike"|"dead";
 export interface WolfView {id:string;x:number;z:number;heading:number;health:number;maxHealth:number;phase:WolfPhase;windupUntil:number}
@@ -24,6 +29,8 @@ export interface CombatPlayer extends VitalView {
   dodgeUntil:number;
   respawnAt:number;
   lastActionSeq:number;
+  abilityReadyAt:number;
+  bulwarkUntil:number;
 }
 export function parseAction(raw:unknown):ActionPacket|null {
   if(!raw||typeof raw!=="object")return null;
@@ -46,10 +53,11 @@ export class CombatSimulation {
   readonly contributors=new Set<string>();
   onWolfDefeated:((eventId:string,contributors:readonly string[])=>void)|null=null;
   resolveAttackDamage:((characterId:string)=>number)|null=null;
+  resolveClass:((characterId:string)=>ClassId|null)|null=null;
   constructor(readonly world:WorldSimulation){}
   join(id:string):void{
     this.players.set(id,{health:MAX_HEALTH,stamina:MAX_STAMINA,maxHealth:MAX_HEALTH,maxStamina:MAX_STAMINA,
-      alive:true,attackReadyAt:0,dodgeReadyAt:0,dodgeUntil:0,respawnAt:0,lastActionSeq:-1});
+      alive:true,attackReadyAt:0,dodgeReadyAt:0,dodgeUntil:0,respawnAt:0,lastActionSeq:-1,abilityReadyAt:0,bulwarkUntil:0});
   }
   leave(id:string):void{
     this.players.delete(id);
@@ -103,6 +111,10 @@ export class CombatSimulation {
     if(this.wolf.phase==="dead")return result(false,"wolf defeated");
     if(range(actor,this.wolf)>ATTACK_RANGE)return result(false,"target out of range");
     const damage=this.resolveAttackDamage?.(id)??ATTACK_DAMAGE;
+    this.damageWolf(id,damage);
+    return result(true);
+  }
+  private damageWolf(id:string,damage:number):void{
     this.wolf.health=Math.max(0,this.wolf.health-Math.max(1,Math.min(100,Math.floor(damage))));
     this.contributors.add(id);
     if(this.wolf.health===0){
@@ -113,6 +125,37 @@ export class CombatSimulation {
       this.contributors.clear();
       this.onWolfDefeated?.("wolf-kill-"+randomUUID(),eligible);
     }
+  }
+  useAbility(id:string,raw:unknown):AbilityResult|null{
+    if(!raw||typeof raw!=="object")return null;
+    const packet=raw as Record<string,unknown>;
+    if(packet.type!=="ability"||!Number.isSafeInteger(packet.seq)||typeof packet.seq!=="number"||packet.seq<0||
+       (packet.ability!=="bulwark"&&packet.ability!=="arc-bolt"&&packet.ability!=="quickstrike"))return null;
+    const p=this.players.get(id),actor=this.world.players.get(id);
+    if(!p||!actor)return null;
+    const ability=packet.ability as ClassAbility;
+    const result=(ok:boolean,reason?:string):AbilityResult=>({
+      type:"ability_result",seq:packet.seq as number,ability,ok,reason,
+      wolfHealth:this.wolf.health,health:p.health,stamina:p.stamina,
+      cooldownSeconds:Math.max(0,p.abilityReadyAt-this.time)
+    });
+    if(packet.seq<=p.lastActionSeq)return result(false,"stale action");
+    p.lastActionSeq=packet.seq;
+    if(!p.alive)return result(false,"you are defeated");
+    const cls=this.resolveClass?.(id);
+    if(!cls||CLASS_ABILITY[cls]!==ability)return result(false,"ability unavailable to this class");
+    if(this.time<p.abilityReadyAt)return result(false,"ability cooling down");
+    const cost=ability==="bulwark"?22:ability==="arc-bolt"?30:25;
+    if(p.stamina<cost)return result(false,"not enough stamina");
+    if(ability!=="bulwark"){
+      if(this.wolf.phase==="dead")return result(false,"wolf defeated");
+      const maxRange=ability==="arc-bolt"?9:ATTACK_RANGE;
+      if(range(actor,this.wolf)>maxRange)return result(false,"target out of range");
+    }
+    p.stamina-=cost;
+    p.abilityReadyAt=this.time+(ability==="bulwark"?14:ability==="arc-bolt"?9:7);
+    if(ability==="bulwark")p.bulwarkUntil=this.time+4;
+    else this.damageWolf(id,ability==="arc-bolt"?28:34);
     return result(true);
   }
   tick(dt=TICK_SECONDS):void{
@@ -152,7 +195,7 @@ export class CombatSimulation {
       const target=w.targetId?this.world.players.get(w.targetId):undefined;
       const targetVital=w.targetId?this.players.get(w.targetId):undefined;
       if(target&&targetVital?.alive&&range(target,w)<3&&this.time>=targetVital.dodgeUntil){
-        targetVital.health=Math.max(0,targetVital.health-BITE_DAMAGE);
+        targetVital.health=Math.max(0,targetVital.health-(this.time<targetVital.bulwarkUntil?Math.ceil(BITE_DAMAGE/2):BITE_DAMAGE));
         if(targetVital.health===0){
           targetVital.alive=false;targetVital.respawnAt=this.time+5;
           target.dx=0;target.dz=0;
