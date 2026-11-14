@@ -1,6 +1,8 @@
 # ⚔️ Realms Unwritten
 
 **Android-first fantasy MMORPG project — currently a playable 3D exploration and small-scale multiplayer prototype.**
+> **Design reference:** We use **World of Warcraft 1.12.1 (vanilla-era)** as the primary benchmark for world structure, faction/race/class design, questing, combat, professions, economy and social systems. All game content remains original. See [MMORPG Reference Standard](docs/WOW_1121_REFERENCE_STANDARD.md).
+
 
 Built with **Bun + TypeScript + Three.js + Vite + Capacitor**, using Blender to generate original rigged GLB character prototypes. Windows/desktop web play is supported for development and testing; Android is the priority platform.
 
