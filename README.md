@@ -17,7 +17,7 @@ Built with **Bun + TypeScript + Three.js + Vite + Capacitor**, using Blender to 
 5. [Exploration, discoveries, settlements, and atlas](#exploration-discoveries-settlements-and-atlas)
 6. [Multiplayer architecture and persistence](#multiplayer-architecture-and-persistence)
 7. [Technology and repository layout](#technology-and-repository-layout)
-8. [Prerequisites and local setup](#prerequisites-and-local-setup)
+8. [Prerequisites and local setup](#prerequisites-and-local-setup) ([Railway](#railway))
 9. [Building Android APKs](#building-android-apks)
 10. [Blender asset pipeline](#blender-asset-pipeline)
 11. [All automated and manual testing steps](#all-automated-and-manual-testing-steps)
@@ -58,7 +58,7 @@ Status meanings: **Implemented** = present in source and exercised by automated 
 | Gathering, crafting, economy | **Prototype** | Bun validates ore gathering, shared cooldown and Ironblade recipe; no wider economy |
 | NPC dialogue, quests, merchants | **Prototype** | Verdant Reach guard offers one persistent Wolf Hunt quest; no dialogue trees or merchants |
 | Chat, party, guilds, dungeons | **Planned** | No social or cooperative gameplay |
-| Production hosting and scale | **Planned** | No managed deployment, sharding, autoscaling or load-test results |
+| Production hosting and scale | **Prototype** | One Railway Bun service and a `/data` volume; no sharding, autoscaling, or load-test results |
 
 **Last audited baseline:** branch `Master`, commit `0c24d4e` (November 2026). [Android / WebSocket smoke CI — passed](https://github.com/mtdewwolf/realms-unwritten/actions/runs/43148146024). This confirms a successful automated build and live two-client smoke test on a GitHub runner; **it is not evidence of real-device Android performance or production service reliability**.
 
@@ -305,7 +305,7 @@ The starter graphical rebuild replaces cube houses with original layered-roof, t
 
 - SQLite via Bun's `bun:sqlite`.
 - Default DB file: `data/realms-world.sqlite`, **relative to the server process's working directory** (when started via the root `dev:server` script, this is `apps/server/data/realms-world.sqlite`).
-- Override with `WORLD_DB_PATH`, preferably an absolute path for deployment.
+- Override with `WORLD_DB_PATH`, preferably an absolute path for deployment. On Railway this is `/data/realms-world.sqlite` on a volume mounted at `/data`. See [Railway](#railway).
 - Server stores **hashes** of guest bearer tokens, names, IDs and x/z positions.
 - Positions are saved every ~10 seconds and on clean WebSocket disconnect / graceful shutdown.
 - There is no account recovery, password login, session renewal or character roster.
@@ -407,6 +407,24 @@ ws://192.168.1.50:3001/ws
 ```
 
 **Replace `192.168.1.50` with your computer's actual IP.** Do not use `localhost` on a phone to reach a different computer. Ensure the firewall allows TCP 3001 and avoid guest Wi-Fi/client-isolation networks. Android **debug** manifests permit cleartext networking; production needs a secure `wss://` endpoint.
+
+### Railway
+
+The hosted game server is only the Bun package `@realms/server`. In Railway the service root directory is `apps/server`, and Railpack starts `bun src/index.ts`. Leave that start command as detected. This service does not build or serve the Vite client.
+
+Mount a volume at `/data` and set:
+
+```text
+WORLD_DB_PATH=/data/realms-world.sqlite
+```
+
+The process creates the parent directory of `WORLD_DB_PATH` when it is missing. It binds `0.0.0.0` and uses Railway's `PORT`. Do not set `HOST` or `PORT`. `apps/server/railway.json` pins the deploy health check to `GET /health` and does not change the build or start command. Use one replica; the world database is a single SQLite file.
+
+On the Android title screen, enter the realm URL `wss://<your-domain>/ws`. The current production realm is `wss://realmsserver-production.up.railway.app/ws`. Railway terminates TLS and forwards that WebSocket to the container.
+
+A redeploy sends SIGTERM. The server saves positions, checkpoints the SQLite WAL into the main database file, and closes it before exiting.
+
+These accounts stay prototype-grade on the hosted server. Passwords are Argon2id hashes and sessions last 30 days, but there is no email recovery, global rate limiting, or account management. Use a unique password. This is not production-ready account security.
 
 ## Building Android APKs
 

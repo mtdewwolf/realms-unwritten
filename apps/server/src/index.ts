@@ -263,11 +263,21 @@ const broadcast=setInterval(()=>{
 const persistence=setInterval(()=>{
   for(const id of world.players.keys())save(id);
 },10000);
+let stopping=false;
 const stop=()=>{
+  if(stopping)return;
+  stopping=true;
   clearInterval(simulation);clearInterval(broadcast);clearInterval(persistence);
-  for(const id of world.players.keys())save(id);
-  db.close();server.stop(true);
+  try{
+    for(const id of world.players.keys())save(id);
+    // Fold the WAL into the main file before close so a redeploy cannot lose the latest positions.
+    db.query("PRAGMA wal_checkpoint(TRUNCATE)").get();
+  }finally{
+    db.close();
+  }
+  void server.stop(true);
 };
-process.once("SIGINT",()=>{stop();process.exit(0);});
-process.once("SIGTERM",()=>{stop();process.exit(0);});
+const shutdown=()=>{try{stop();}finally{process.exit(0);}};
+process.once("SIGINT",shutdown);
+process.once("SIGTERM",shutdown);
 console.log("Realms Unwritten server on "+server.url+" (WebSocket: /ws)");
