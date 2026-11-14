@@ -14,9 +14,12 @@ export interface ServerVitals{health:number;stamina:number;maxHealth:number;maxS
 interface Snapshot{type:"snapshot";tick:number;you:PlayerState;others:PlayerState[];ack:number;vitals:ServerVitals;wolf:ServerWolf|null}
 export interface CombatActionResult{type:"action_result";seq:number;action:"attack"|"dodge";ok:boolean;reason?:string;wolfHealth:number;health:number;stamina:number}
 export interface ClassAbilityResult{type:"ability_result";seq:number;ability:"bulwark"|"arc-bolt"|"quickstrike";ok:boolean;reason?:string;wolfHealth:number;health:number;stamina:number;cooldownSeconds:number}
-type ServerMessage=ClassAbilityResult|{type:"creation_required"}|{type:"creation_result";ok:false;reason:string}|{type:"use_result";ok:boolean;reason?:string;item?:string;health?:number}|{type:"resource_result";action:"gather"|"craft";ok:boolean;reason?:string;item?:string;amount?:number;nodeId?:string;retryAfterMs?:number}|{type:"equip_result";ok:boolean;reason?:string}|{type:"welcome";protocol:number;id:string;token:string;player:PlayerState;character:CharacterIdentity}|Snapshot|CombatActionResult|InventoryState|RewardEvent|QuestState|QuestResult|ProgressionState|{type:"error";message:string};
+type ServerMessage={type:"auth_required"}|{type:"auth_result";ok:false;reason:string}|{type:"account_ready";token:string;hasCharacter:boolean}|ClassAbilityResult|{type:"creation_required"}|{type:"creation_result";ok:false;reason:string}|{type:"use_result";ok:boolean;reason?:string;item?:string;health?:number}|{type:"resource_result";action:"gather"|"craft";ok:boolean;reason?:string;item?:string;amount?:number;nodeId?:string;retryAfterMs?:number}|{type:"equip_result";ok:boolean;reason?:string}|{type:"welcome";protocol:number;id:string;token:string;player:PlayerState;character:CharacterIdentity}|Snapshot|CombatActionResult|InventoryState|RewardEvent|QuestState|QuestResult|ProgressionState|{type:"error";message:string};
 export interface MovementInput{dx:number;dz:number}
 const TOKEN_KEY="realms-unwritten-guest-token-v1";
+const ACCOUNT_TOKEN_KEY="realms-unwritten-account-session-v1";
+function accountToken():string|null{try{return localStorage.getItem(ACCOUNT_TOKEN_KEY);}catch{return null;}}
+function saveAccountToken(t:string):void{try{localStorage.setItem(ACCOUNT_TOKEN_KEY,t);}catch{/* session-only */}}
 function storedToken():string|null{try{return localStorage.getItem(TOKEN_KEY);}catch{return null;}}
 function saveToken(t:string):void{try{localStorage.setItem(TOKEN_KEY,t);}catch{/* volatile guest */}}
 export class MultiplayerClient {
@@ -29,15 +32,17 @@ export class MultiplayerClient {
   private online=false;
   private targetUrl:string|null=null;
   private autoReconnect=false;
+  private mode:"account"|"guest"="account";
   private retries=0;
   private retryTimer:ReturnType<typeof setTimeout>|null=null;
   private helloTimer:ReturnType<typeof setTimeout>|null=null;
-  constructor(private readonly scene:THREE.Scene,private readonly avatar:THREE.Group,private readonly status:(s:string)=>void,private readonly onCombat:(vitals:ServerVitals,wolf:ServerWolf|null)=>void,private readonly onActionResult:(result:CombatActionResult)=>void,private readonly onOffline:()=>void,private readonly onInventory:(state:InventoryState)=>void,private readonly onReward:(event:RewardEvent)=>void,private readonly onQuest:(quest:QuestState)=>void,private readonly onQuestResult:(result:QuestResult)=>void,private readonly onProgression:(state:ProgressionState)=>void,private readonly onResource:(result:{type:"resource_result";action:"gather"|"craft";ok:boolean;nodeId?:string;retryAfterMs?:number})=>void,private readonly onCreationRequired:()=>void,private readonly onIdentity:(identity:CharacterIdentity)=>void,private readonly onAbility:(result:ClassAbilityResult)=>void){}
+  constructor(private readonly scene:THREE.Scene,private readonly avatar:THREE.Group,private readonly status:(s:string)=>void,private readonly onCombat:(vitals:ServerVitals,wolf:ServerWolf|null)=>void,private readonly onActionResult:(result:CombatActionResult)=>void,private readonly onOffline:()=>void,private readonly onInventory:(state:InventoryState)=>void,private readonly onReward:(event:RewardEvent)=>void,private readonly onQuest:(quest:QuestState)=>void,private readonly onQuestResult:(result:QuestResult)=>void,private readonly onProgression:(state:ProgressionState)=>void,private readonly onResource:(result:{type:"resource_result";action:"gather"|"craft";ok:boolean;nodeId?:string;retryAfterMs?:number})=>void,private readonly onCreationRequired:()=>void,private readonly onIdentity:(identity:CharacterIdentity)=>void,private readonly onAbility:(result:ClassAbilityResult)=>void,private readonly onAuthRequired:()=>void,private readonly onAuthReady:(hasCharacter:boolean)=>void,private readonly onAuthError:(message:string)=>void){}
   get connected():boolean{return this.online&&this.socket?.readyState===WebSocket.OPEN;}
-  connect(url:string):void{
+  connect(url:string,mode:"account"|"guest"="account"):void{
     this.disconnect();
     if(!/^wss?:\/\/\S+$/i.test(url)){this.status("Enter a valid ws:// or wss:// server URL");return;}
     this.targetUrl=url;
+    this.mode=mode;
     this.autoReconnect=true;
     this.retries=0;
     this.openSocket();
@@ -64,12 +69,20 @@ export class MultiplayerClient {
     this.socket=ws;
     ws.onopen=()=>{
       if(this.socket!==ws)return;
-      ws.send(JSON.stringify({type:"hello",token:storedToken()||undefined,name:"Adventurer"}));
+      ws.send(JSON.stringify(this.mode==="account"?{type:"hello",mode:"account",accountToken:accountToken()||undefined}:{type:"hello",mode:"guest",token:storedToken()||undefined,name:"Adventurer"}));
       this.helloTimer=setTimeout(()=>{if(this.socket===ws&&!this.online)ws.close(4000,"Join timeout");},HELLO_TIMEOUT_MS);
     };
     ws.onmessage=event=>{
       let message:ServerMessage;
       try{message=JSON.parse(String(event.data)) as ServerMessage;}catch{return;}
+      if(message.type==="auth_required"){
+        if(this.helloTimer!==null){clearTimeout(this.helloTimer);this.helloTimer=null;}
+        this.onAuthRequired();return;
+      }
+      if(message.type==="auth_result"){this.onAuthError(message.reason);return;}
+      if(message.type==="account_ready"){
+        saveAccountToken(message.token);this.onAuthReady(message.hasCharacter);return;
+      }
       if(message.type==="creation_required"){
         if(this.helloTimer!==null){clearTimeout(this.helloTimer);this.helloTimer=null;}
         this.onCreationRequired();this.status("Choose your faction, heritage and class");return;
@@ -83,10 +96,12 @@ export class MultiplayerClient {
         return;
       }
       if(message.type==="welcome"){
-        if(message.protocol!==10){this.autoReconnect=false;ws.close(4004,"Incompatible protocol");this.status("Incompatible server protocol");return;}
+        if(message.protocol!==11){this.autoReconnect=false;ws.close(4004,"Incompatible protocol");this.status("Incompatible server protocol");return;}
         if(this.helloTimer!==null){clearTimeout(this.helloTimer);this.helloTimer=null;}
         this.retries=0;
-        this.id=message.id;saveToken(message.token);this.online=true;
+        this.id=message.id;
+        if(this.mode==="account")saveAccountToken(message.token);else saveToken(message.token);
+        this.online=true;
         this.onIdentity(message.character);
         this.avatar.position.x=message.player.x;this.avatar.position.z=message.player.z;
         this.status("Online · authoritative movement connected");return;
@@ -149,6 +164,15 @@ export class MultiplayerClient {
     const delay=reconnectDelay(this.retries);
     this.status("Connection lost · reconnecting "+this.retries+"/"+MAX_RECONNECT_ATTEMPTS);
     this.retryTimer=setTimeout(()=>{this.retryTimer=null;this.openSocket();},delay);
+  }
+  authenticate(mode:"account_register"|"account_login",username:string,password:string):boolean{
+    if(this.online||!this.socket||this.socket.readyState!==WebSocket.OPEN)return false;
+    this.socket.send(JSON.stringify({type:mode,username,password}));
+    return true;
+  }
+  signOut():void{
+    try{localStorage.removeItem(ACCOUNT_TOKEN_KEY);}catch{/* session only */}
+    this.disconnect();
   }
   createCharacter(choice:CharacterCreation):boolean{
     if(this.online||!this.socket||this.socket.readyState!==WebSocket.OPEN)return false;

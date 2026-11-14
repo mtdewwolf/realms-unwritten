@@ -12,6 +12,7 @@ import { CharacterPanel } from "./ui/character";
 import { ResourceGuide } from "./ui/resourceGuide";
 import { GameMenu } from "./ui/gameMenu";
 import { CharacterCreator } from "./ui/characterCreator";
+import {TitleScreen} from "./ui/titleScreen";
 import {createRaceCharacter} from "./characters/raceModel";
 import {DEFAULT_APPEARANCE,type ClassId} from "../../shared/src/characterCatalog";
 import { moveWithCollision } from "./world/collision";
@@ -130,6 +131,7 @@ const inventoryPanel=new InventoryPanel(app,item=>multiplayer.sendEquip(item),re
 const questPanel=new QuestPanel(app,scene,action=>multiplayer.sendQuest(action));
 const characterPanel=new CharacterPanel(app,()=>multiplayer.requestProgression());
 const creator=new CharacterCreator(app,choice=>multiplayer.createCharacter(choice));
+let title:TitleScreen;
 inventoryPanel.button.addEventListener("click",()=>multiplayer.requestInventory());
 let onlineWolf:ServerWolf|null=null;
 let lastServerStrikePhase="";
@@ -168,6 +170,8 @@ const multiplayer = new MultiplayerClient(scene, avatar,
     inventoryPanel.offline();
     questPanel.offline();
     characterPanel.offline();
+    app.classList.remove("game-entered");
+    if(title)title.show();
   },
   state=>inventoryPanel.update(state),
   reward=>{battleInfo.textContent="Loot earned: "+reward.items.map(item=>item.name).join(", ")+" +"+reward.coins+" coins";},
@@ -175,9 +179,9 @@ const multiplayer = new MultiplayerClient(scene, avatar,
   result=>{questPanel.result(result);if(result.ok&&result.action==="turnin")status.textContent="Wolf Hunt complete · +25 coins";},
   state=>{const newLevel=characterPanel.update(state);if(newLevel!==null)status.textContent="Level up! You reached level "+newLevel;},
   result=>{if(result.action==="gather"&&result.nodeId&&result.retryAfterMs)resourceGuide.markCooldown(result.nodeId,result.retryAfterMs);},
-  ()=>creator.show(),
+  ()=>{title.hide();creator.show();},
   identity=>{
-    creator.hide();characterPanel.setIdentity(identity);
+    creator.hide();title.hide();app.classList.add("game-entered");characterPanel.setIdentity(identity);
     avatar.remove(adventurer.root);adventurer.dispose();
     adventurer=createRaceCharacter(identity);avatar.add(adventurer.root);
     activeClass=identity.characterClass;
@@ -193,15 +197,21 @@ const multiplayer = new MultiplayerClient(scene, avatar,
         "Quickstrike hit · wolf HP "+result.wolfHealth;
       if(result.ability!=="bulwark")attackingUntil=performance.now()/1000+.35;
     }else battleInfo.textContent=result.reason??"Class ability rejected";
-  }
+  },
+  ()=>title.authRequired(),
+  hasCharacter=>title.message(hasCharacter?"Account loaded · entering world":"Account ready · create your character"),
+  error=>{title.message(error);title.show();}
 );
+title=new TitleScreen(app,(url,mode)=>multiplayer.connect(url,mode),req=>multiplayer.authenticate(req.mode,req.username,req.password),()=>{
+  multiplayer.disconnect();app.classList.add("game-entered");status.textContent="Offline demo · no account or progression saved";
+});
 const multiplayerPanel=document.createElement("div");
 multiplayerPanel.id="multiplayer-panel";
 multiplayerPanel.innerHTML='<input id="server-url" aria-label="Multiplayer server URL" placeholder="ws://192.168.1.50:3001/ws" autocomplete="off"/><button id="server-connect" type="button">CONNECT</button><button id="server-disconnect" type="button">OFFLINE</button>';
 app.appendChild(multiplayerPanel);
 const serverUrlInput=multiplayerPanel.querySelector<HTMLInputElement>("#server-url")!;
-multiplayerPanel.querySelector("#server-connect")!.addEventListener("click",()=>multiplayer.connect(serverUrlInput.value.trim()));
-multiplayerPanel.querySelector("#server-disconnect")!.addEventListener("click",()=>{multiplayer.disconnect();status.textContent="Offline · local exploration";});
+multiplayerPanel.querySelector("#server-connect")!.addEventListener("click",()=>{app.classList.remove("game-entered");title.show();title.url.value=serverUrlInput.value.trim();});
+multiplayerPanel.querySelector("#server-disconnect")!.addEventListener("click",()=>{multiplayer.signOut();title.show();status.textContent="Signed out";});
 const gameMenu=new GameMenu(app);
 const controlledPanels=[
   {tab:"map" as const,open:()=>atlas.open(),close:()=>atlas.close()},
@@ -363,6 +373,12 @@ abilityButton.addEventListener("click",()=>{
 let previous = performance.now();
 let elapsed = 0;
 function frame(now: number) {
+  if(!app.classList.contains("game-entered")){
+    previous=now;
+    renderer.render(scene,camera);
+    requestAnimationFrame(frame);
+    return;
+  }
   const dt = Math.min((now - previous) / 1000, 0.05);
   previous = now;
   elapsed += dt;

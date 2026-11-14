@@ -173,3 +173,36 @@
 #class-ability{border:1px solid #e2c984;background:#614680e9;color:#f3e9ff;touch-action:manipulation}
 #class-ability:disabled{opacity:.6}
 @media(max-width:700px){#class-ability span{font-size:9px;letter-spacing:0}}
+
+/* Title and explicit entry states: no hidden bypass into the playable scene. */
+#app:not(.game-entered) #stick,#app:not(.game-entered) #actions,#app:not(.game-entered) #combat-hud,
+#app:not(.game-entered) #hint,#app:not(.game-entered) #status,#app:not(.game-entered) #resource-guide,
+#app:not(.game-entered) #world-map-guidance,#app:not(.game-entered) #game-menu-button,
+#app:not(.game-entered) #world-coordinates,#app:not(.game-entered) #exploration,
+#app:not(.game-entered) header{display:none!important}
+#realm-title{position:absolute;inset:0;z-index:105;overflow-y:auto;overscroll-behavior:contain;touch-action:pan-y;background:radial-gradient(ellipse at 50% 5%,#475b63 0%,#14252b 45%,#0c151d 100%);font-family:Georgia,serif;color:#ebdcc2;text-align:center}
+#realm-title[hidden]{display:none}
+#realm-title .realm-atmosphere{position:fixed;inset:0;pointer-events:none;overflow:hidden;opacity:.85}
+#realm-title .realm-moon{position:absolute;top:6%;left:58%;height:180px;width:180px;border-radius:50%;background:radial-gradient(circle,#d9dfc7,#a3b9ad 60%,transparent 70%);filter:blur(1px);opacity:.33}
+#realm-title .realm-ridge{position:absolute;bottom:-2%;width:100%;height:42%;background:linear-gradient(125deg,#152c31,#142022 50%,#263629);clip-path:polygon(0 58%,12% 37%,25% 68%,41% 30%,56% 59%,72% 14%,86% 45%,100% 22%,100% 100%,0 100%)}
+#realm-title .realm-spire{position:absolute;bottom:10%;width:80px;height:52%;background:linear-gradient(90deg,#182528,#314344,#0f1c24);clip-path:polygon(50% 0,65% 18%,65% 27%,82% 30%,82% 100%,18% 100%,18% 30%,35% 27%,35% 18%);opacity:.5}
+#realm-title .spire-one{left:15%}.spire-two{right:14%;height:70%;width:110px}.spire-three{right:36%;height:40%;width:55px}
+#realm-title .realm-title-inner{position:relative;z-index:1;max-width:760px;margin:0 auto;padding:max(17px,env(safe-area-inset-top)) 16px max(28px,env(safe-area-inset-bottom))}
+#realm-title .realm-crest{font-size:30px;color:#e9c78c;text-shadow:0 2px 15px #edba6e}
+#realm-title .realm-overline{font:700 10px system-ui,sans-serif;letter-spacing:.38em;color:#a5adac;margin:5px}
+#realm-title h1{margin:5px 0;font-size:clamp(34px,7vw,74px);line-height:.95;letter-spacing:.045em;text-shadow:0 4px 2px #080d17,0 0 32px #dabc7544;color:#f0d8a7}
+#realm-title h1 em{display:block;font-style:normal;color:#d1b77e;font-size:.82em}
+#realm-title .realm-tagline{font-size:13px;color:#ded7c8;margin:14px auto 17px}
+#realm-title .realm-auth-card{margin:0 auto;padding:18px 20px;max-width:440px;text-align:left;background:linear-gradient(150deg,#192b30f2,#171b22f5);border:2px solid #977847;border-radius:15px;box-shadow:inset 0 0 0 2px #342f27,0 16px 65px #04080bba}
+#realm-title .realm-auth-card h2{text-align:center;color:#f2d7a5;margin:0 0 7px;font-size:22px}
+#realm-title .realm-description{text-align:center;font:12px/1.5 system-ui,sans-serif;color:#bcc3be;margin:0 0 14px}
+#realm-title label{display:block;font:700 11px system-ui,sans-serif;letter-spacing:.07em;color:#ded4b8;margin:10px 0 5px}
+#realm-title input{width:100%;min-height:43px;padding:10px 12px;background:#0f1e26;color:#f1eadd;border:1px solid #647779;border-radius:7px;font:14px system-ui,sans-serif}
+#realm-title button{min-height:44px;padding:10px 12px;color:#261a0f;background:linear-gradient(#f5d28d,#b88c4c);border:1px solid #edd19a;border-radius:8px;font:700 11px system-ui,sans-serif;letter-spacing:.035em;touch-action:manipulation}
+#realm-title .realm-secondary{background:linear-gradient(#465b60,#293b46);color:#efe8d6;border-color:#839698}
+#realm-connect{width:100%;margin-top:9px}
+#realm-title .realm-auth-actions,#realm-title .realm-alt-actions{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:12px}
+#realm-title .realm-alt-actions button{font-size:10px;background:#283b42;color:#c7cfd2;border-color:#617175}
+#realm-login-status{font:12px/1.5 system-ui,sans-serif;color:#e2c48d;min-height:24px;margin:11px 0}
+#realm-title .realm-disclaimer{font:10px/1.4 system-ui,sans-serif;color:#a7b6b4;max-width:500px;margin:13px auto}
+@media(max-width:500px){#realm-title .realm-auth-card{padding:13px}#realm-title .realm-title-inner{padding-top:max(10px,env(safe-area-inset-top))}#realm-title h1{font-size:37px}}
