@@ -2,6 +2,7 @@ import * as THREE from "three";
 import "./style.css";
 import { populateFrontierProps } from "./world/frontierProps";
 import {createFantasyCottage,decorateVillage} from "./world/fantasyArchitecture";
+import {decorateFactionOutposts} from "./world/factionOutposts";
 import { ChunkedWorld, WORLD_HALF_SIZE, chunkCoordinate, groundHeightAt } from "./world/chunkedWorld";
 import { biomeAt } from "./world/terrain";
 import { landmarksNear, discoverableLandmarks } from "./world/landmarks";
@@ -57,6 +58,7 @@ world.update(0,0);
 for(const [x,z,style] of [[-6,-5,0],[7,-9,1],[-7,7,2]] as const)
   scene.add(createFantasyCottage(x,z,style));
 decorateVillage(scene);
+decorateFactionOutposts(scene);
 populateFrontierProps(scene);
 
 let adventurer = createRaceCharacter({race:"sunborne",characterClass:"vanguard",appearance:DEFAULT_APPEARANCE});

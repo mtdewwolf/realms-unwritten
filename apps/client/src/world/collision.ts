@@ -15,6 +15,10 @@ function boxAt(x:number,z:number,half=1.5):CollisionBox{
 }
 function nearbyBoxes(x:number,z:number):CollisionBox[]{
   const boxes=[...STARTER_HOUSES];
+  // Two buildings per faction camp; the tower and arch remain visual-only.
+  for(const [cx,cz] of [[-68,44],[68,-44]])
+    if(Math.abs(x-cx)<35&&Math.abs(z-cz)<35)
+      for(const dx of [-9,9])boxes.push(boxAt(cx+dx,cz+(cx<0?-6:6)));
   for(const settlement of settlementsNear(x,z,48)){
     if(settlement.id==="settlement-starter")continue;
     const count=settlement.tier==="outpost"?4:2;
