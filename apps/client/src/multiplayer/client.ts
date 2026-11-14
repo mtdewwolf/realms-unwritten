@@ -33,16 +33,18 @@ export class MultiplayerClient {
   private targetUrl:string|null=null;
   private autoReconnect=false;
   private mode:"account"|"guest"="account";
+  private freshAuth=false;
   private retries=0;
   private retryTimer:ReturnType<typeof setTimeout>|null=null;
   private helloTimer:ReturnType<typeof setTimeout>|null=null;
   constructor(private readonly scene:THREE.Scene,private readonly avatar:THREE.Group,private readonly status:(s:string)=>void,private readonly onCombat:(vitals:ServerVitals,wolf:ServerWolf|null)=>void,private readonly onActionResult:(result:CombatActionResult)=>void,private readonly onOffline:()=>void,private readonly onInventory:(state:InventoryState)=>void,private readonly onReward:(event:RewardEvent)=>void,private readonly onQuest:(quest:QuestState)=>void,private readonly onQuestResult:(result:QuestResult)=>void,private readonly onProgression:(state:ProgressionState)=>void,private readonly onResource:(result:{type:"resource_result";action:"gather"|"craft";ok:boolean;nodeId?:string;retryAfterMs?:number})=>void,private readonly onCreationRequired:()=>void,private readonly onIdentity:(identity:CharacterIdentity)=>void,private readonly onAbility:(result:ClassAbilityResult)=>void,private readonly onAuthRequired:()=>void,private readonly onAuthReady:(hasCharacter:boolean)=>void,private readonly onAuthError:(message:string)=>void){}
   get connected():boolean{return this.online&&this.socket?.readyState===WebSocket.OPEN;}
-  connect(url:string,mode:"account"|"guest"="account"):void{
+  connect(url:string,mode:"account"|"guest"="account",freshAuth=false):void{
     this.disconnect();
     if(!/^wss?:\/\/\S+$/i.test(url)){this.status("Enter a valid ws:// or wss:// server URL");return;}
     this.targetUrl=url;
     this.mode=mode;
+    this.freshAuth=freshAuth;
     this.autoReconnect=true;
     this.retries=0;
     this.openSocket();
@@ -69,7 +71,7 @@ export class MultiplayerClient {
     this.socket=ws;
     ws.onopen=()=>{
       if(this.socket!==ws)return;
-      ws.send(JSON.stringify(this.mode==="account"?{type:"hello",mode:"account",accountToken:accountToken()||undefined}:{type:"hello",mode:"guest",token:storedToken()||undefined,name:"Adventurer"}));
+      ws.send(JSON.stringify(this.mode==="account"?{type:"hello",mode:"account",accountToken:this.freshAuth?undefined:accountToken()||undefined}:{type:"hello",mode:"guest",token:storedToken()||undefined,name:"Adventurer"}));
       this.helloTimer=setTimeout(()=>{if(this.socket===ws&&!this.online)ws.close(4000,"Join timeout");},HELLO_TIMEOUT_MS);
     };
     ws.onmessage=event=>{
@@ -81,6 +83,7 @@ export class MultiplayerClient {
       }
       if(message.type==="auth_result"){this.onAuthError(message.reason);return;}
       if(message.type==="account_ready"){
+        this.freshAuth=false;
         saveAccountToken(message.token);this.onAuthReady(message.hasCharacter);return;
       }
       if(message.type==="creation_required"){

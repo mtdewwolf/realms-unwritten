@@ -5,7 +5,7 @@ export class TitleScreen{
  readonly url:HTMLInputElement;
  private readonly status:HTMLElement;
  private pending:LoginRequest|null=null;
- constructor(host:HTMLElement,private readonly connect:(url:string,mode:"account"|"guest")=>void,private readonly sendAuth:(req:LoginRequest)=>boolean,private readonly offline:()=>void){
+ constructor(host:HTMLElement,private readonly connect:(url:string,mode:"account"|"guest",freshAuth:boolean)=>void,private readonly sendAuth:(req:LoginRequest)=>boolean,private readonly offline:()=>void){
   const el=document.createElement("section");
   el.id="realm-title";el.setAttribute("aria-label","Realms Unwritten account and character selection");
   el.innerHTML=[
@@ -47,7 +47,7 @@ export class TitleScreen{
   if(!/^wss?:\/\/\S+$/i.test(value)){this.message("Enter the full ws:// or wss:// realm URL.");return;}
   this.message("Connecting to realm…");
   try{localStorage.setItem("realms-unwritten-server-url",value);}catch{/* storage unavailable */}
-  this.connect(value,mode);
+  this.connect(value,mode,!!this.pending);
  }
  authRequired():void{
   if(!this.pending){this.message("Connected. Create an account or sign in.");return;}

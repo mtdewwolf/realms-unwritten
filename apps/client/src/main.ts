@@ -179,10 +179,10 @@ const multiplayer = new MultiplayerClient(scene, avatar,
     }else battleInfo.textContent=result.reason??"Class ability rejected";
   },
   ()=>title.authRequired(),
-  hasCharacter=>title.message(hasCharacter?"Account loaded · entering world":"Account ready · create your character"),
+  hasCharacter=>{title.authenticated();title.message(hasCharacter?"Account loaded · entering world":"Account ready · create your character");},
   error=>{title.message(error);title.show();}
 );
-title=new TitleScreen(app,(url,mode)=>multiplayer.connect(url,mode),req=>multiplayer.authenticate(req.mode,req.username,req.password),()=>{
+title=new TitleScreen(app,(url,mode,freshAuth)=>multiplayer.connect(url,mode,freshAuth),req=>multiplayer.authenticate(req.mode,req.username,req.password),()=>{
   multiplayer.disconnect();app.classList.add("game-entered");status.textContent="Offline demo · no account or progression saved";
 });
 const multiplayerPanel=document.createElement("div");
