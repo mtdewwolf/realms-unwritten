@@ -82,8 +82,9 @@ function buildKind(kind:FloraKind):{geometry:THREE.BufferGeometry;materials:THRE
  for(const part of parts){
   part.g.computeVertexNormals();
   const matIndex=mats.indexOf(part.m);
+  const [rx,ry,rz]=part.rot??[0,0,0];
   const transform=new THREE.Matrix4().compose(new THREE.Vector3(...part.pos),
-   new THREE.Quaternion().setFromEuler(new THREE.Euler(...(part.rot??[0,0,0]))),new THREE.Vector3(1,1,1));
+   new THREE.Quaternion().setFromEuler(new THREE.Euler(rx,ry,rz)),new THREE.Vector3(1,1,1));
   const normalMatrix=new THREE.Matrix3().getNormalMatrix(transform);
   const p=part.g.getAttribute("position"),n=part.g.getAttribute("normal"),ix=part.g.getIndex();
   for(let j=0;j<p.count;j++){

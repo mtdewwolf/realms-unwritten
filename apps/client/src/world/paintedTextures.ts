@@ -1,6 +1,6 @@
 import * as THREE from "three";
 /** Original low-resolution hand-painted-style texture synthesis; no imported game assets. */
-export type SurfaceKind="plaster"|"timber"|"slate"|"stone";
+export type SurfaceKind="plaster"|"timber"|"slate"|"stone"|"ground";
 function hash(x:number,y:number,salt:number):number{
  const a=Math.imul(x+salt,374761393)^Math.imul(y^salt,668265263);
  let z=Math.imul(a^(a>>>13),1274126177);
@@ -9,6 +9,11 @@ function hash(x:number,y:number,salt:number):number{
 export function samplePaintedSurface(kind:SurfaceKind,x:number,y:number):[number,number,number]{
  const rough=hash(x>>2,y>>2,27),grain=hash(x,y,71);
  let value=190+(rough-.5)*37+(grain-.5)*20;
+ if(kind==="ground"){
+   const tuft=hash(x>>1,y>>1,121),speck=hash(x,y,73);
+   value=222+(rough-.5)*27+(tuft-.5)*28+(speck-.5)*16;
+   if((x*7+y*17)%31===0)value-=22;
+ }
  if(kind==="plaster")value+=8*Math.sin(x*.18+y*.07);
  if(kind==="timber")value+=14*Math.sin((x+y*.12)*.56);
  if(kind==="slate"){

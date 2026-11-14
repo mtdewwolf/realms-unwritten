@@ -3,6 +3,8 @@ import { biomeAt, terrainHeightAt, terrainColorAt, TERRAIN_GRID_STEP } from "./t
 import { addChunkLandmarks, disposeChunkLandmarks } from "./landmarkVisuals";
 import { addChunkInfrastructure, disposeChunkInfrastructure } from "./infrastructureVisuals";
 import {herbsInChunk} from "./herbs";
+import {addBiomeFlora} from "./biomeFlora";
+import {paintedTexture} from "./paintedTextures";
 
 export const CHUNK_SIZE=64;
 export const WORLD_CHUNKS_PER_SIDE=256;
@@ -37,13 +39,14 @@ export function activeChunkCoordinates(x:number,z:number,radius=ACTIVE_CHUNK_RAD
 /** Build a piecewise-linear heightfield in the same coordinate system used by collision. */
 export function buildTerrainChunkGeometry(cx:number,cz:number):THREE.BufferGeometry {
   const sides=CHUNK_SIZE/TERRAIN_GRID_STEP;
-  const positions:number[]=[],colors:number[]=[],indices:number[]=[];
+  const positions:number[]=[],colors:number[]=[],uvs:number[]=[],indices:number[]=[];
   for(let z=0;z<=sides;z++){
     for(let x=0;x<=sides;x++){
       const lx=x*TERRAIN_GRID_STEP,lz=z*TERRAIN_GRID_STEP;
       const wx=cx*CHUNK_SIZE+lx,wz=cz*CHUNK_SIZE+lz;
       const y=terrainHeightAt(wx,wz);
       positions.push(lx,y,lz);
+      uvs.push(lx/CHUNK_SIZE*8,lz/CHUNK_SIZE*8);
       colors.push(...terrainColorAt(wx,wz));
     }
   }
@@ -54,6 +57,7 @@ export function buildTerrainChunkGeometry(cx:number,cz:number):THREE.BufferGeome
   const geometry=new THREE.BufferGeometry();
   geometry.setAttribute("position",new THREE.Float32BufferAttribute(positions,3));
   geometry.setAttribute("color",new THREE.Float32BufferAttribute(colors,3));
+  geometry.setAttribute("uv",new THREE.Float32BufferAttribute(uvs,2));
   geometry.setIndex(indices);
   geometry.computeVertexNormals();
   return geometry;
@@ -74,7 +78,7 @@ export function groundHeightAt(x:number,z:number):number{
 }
 export class ChunkedWorld {
   private readonly active=new Map<string,{group:THREE.Group;geometry:THREE.BufferGeometry}>();
-  private readonly groundMaterial=new THREE.MeshLambertMaterial({vertexColors:true,side:THREE.FrontSide});
+  private readonly groundMaterial=new THREE.MeshLambertMaterial({vertexColors:true,side:THREE.FrontSide,map:paintedTexture("ground")});
   private readonly trunkGeo=new THREE.CylinderGeometry(.2,.3,2.1,6);
   private readonly foliageGeo=new THREE.IcosahedronGeometry(1.55,1);
   private readonly canopyGeo=new THREE.IcosahedronGeometry(1.26,1);
@@ -150,6 +154,7 @@ export class ChunkedWorld {
       plant.position.set(herb.x-cx*CHUNK_SIZE,groundHeightAt(herb.x,herb.z),herb.z-cz*CHUNK_SIZE);
       group.add(plant);
     }
+    addBiomeFlora(group,cx,cz,CHUNK_SIZE,groundHeightAt);
     addChunkLandmarks(group,cx,cz,CHUNK_SIZE,groundHeightAt);
     addChunkInfrastructure(group,cx,cz,CHUNK_SIZE,groundHeightAt);
     return {group,geometry};
