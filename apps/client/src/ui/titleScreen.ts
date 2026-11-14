@@ -56,6 +56,7 @@ export class TitleScreen{
   else this.message(request.mode==="account_register"?"Creating your account…":"Signing in…");
  }
  message(value:string):void{this.status.textContent=value;}
+ authenticated():void{this.element.querySelector<HTMLInputElement>("#realm-password")!.value="";}
  show():void{this.element.hidden=false;}
  hide():void{this.element.hidden=true;}
  get visible():boolean{return !this.element.hidden;}
