@@ -275,6 +275,10 @@ Deterministic **Moonleaf** plants now appear in meadow and woodland regions and 
 
 Bun now enforces **circle-versus-rectangle collisions** against the three Verdant Reach starter houses and generated settlement houses. The Android client uses the same deterministic resolver for offline walking and dash visualization. Diagonal movement slides along walls; movement uses substeps to avoid passing through narrow building footprints. Existing character positions inside houses are relocated safely upon login. This is a first building-collision milestone, not complete physical world collision: terrain props and cliffs remain non-blocking. See [Building Collision](docs/BUILDING_COLLISION.md).
 
+### Guest reconnect and session recovery
+
+Android now retries transient WebSocket disconnects with six bounded exponential attempts (500ms through 12s), an 8s join timeout, and automatic rejoin with the existing guest token. Explicit OFFLINE, incompatible protocol, and invalid credentials stop retries. Successful reconnection resets movement/action sequences, restores server position, and reloads inventory, quests and XP. Bun permits a valid guest token to take over its own older session: the previous session is saved/detached before replacement, preventing duplicate active characters. This protects against stale sockets after a brief network interruption, but is **not secure account authentication**; anyone possessing the guest bearer token can take over that character. See [Reconnection Architecture](docs/RECONNECTION.md).
+
 ### Guest persistence
 
 - SQLite via Bun's `bun:sqlite`.
@@ -798,6 +802,7 @@ Frequency:
 - [Android Game Menu and HUD](docs/ANDROID_GAME_MENU.md)
 - [Moonleaf Foraging and Healing Tonics](docs/MOONLEAF_TONICS.md)
 - [Authoritative Building Collision](docs/BUILDING_COLLISION.md)
+- [Guest Reconnection and Session Recovery](docs/RECONNECTION.md)
 - [World Streaming](docs/WORLD_STREAMING.md)
 - [Terrain and Biomes](docs/TERRAIN_BIOMES.md)
 - [World Landmarks / Content](docs/WORLD_CONTENT.md)

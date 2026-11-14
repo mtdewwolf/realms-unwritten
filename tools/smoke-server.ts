@@ -127,6 +127,27 @@ async function run(){
   const unearned=waitFor(first.socket,"resource_result");
   first.socket.send(JSON.stringify({type:"craft",recipe:"healing-tonic",moonleaf:999}));
   if((await unearned).ok)throw Error("Forged Moonleaf crafting was accepted");
+  // Same token must reclaim a character even when old network socket is still alive.
+  const restoredSocket=new WebSocket("ws://127.0.0.1:"+port+"/ws");
+  sockets.push(restoredSocket);
+  const resumed=new Promise<any>((resolve,reject)=>{
+    const timer=setTimeout(()=>reject(Error("Guest reconnect timed out")),3500);
+    restoredSocket.addEventListener("open",()=>restoredSocket.send(JSON.stringify({type:"hello",token:first.welcome.token,name:"Test Adventurer"})));
+    restoredSocket.addEventListener("message",event=>{
+      const packet=JSON.parse(String(event.data));
+      if(packet.type==="welcome"){clearTimeout(timer);resolve(packet);}
+    });
+  });
+  const recovered=await resumed;
+  if(recovered.id!==first.welcome.id)throw Error("Reconnect minted a new character");
+  if(recovered.player.x<.1)throw Error("Reconnect lost the last authoritative position");
+  const health=await (await fetch("http://127.0.0.1:"+port+"/health")).json() as {players:number};
+  if(health.players!==2)throw Error("Reconnect created a duplicate active player");
+  const inventoryAfter=waitFor(restoredSocket,"inventory");
+  restoredSocket.send(JSON.stringify({type:"inventory"}));
+  if((await inventoryAfter).coins!==bag.coins)throw Error("Reconnect lost inventory");
+  // Replaying an existing token on another device must take over, not mint a second session.
+  console.log("PASS guest reconnect: same identity, saved position, single active session and inventory");
   console.log("PASS multiplayer smoke: shared combat, quest, equipment and rejected forged gathering/crafting");
 }
 try{await run();}

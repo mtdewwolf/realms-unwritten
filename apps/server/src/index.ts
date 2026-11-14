@@ -93,9 +93,13 @@ const server=Bun.serve<Session>({
           stored={id,name:hello.name||"Adventurer",x:0,z:0};
           insertCharacter.run(id,hash(token),stored.name,0,0,Date.now());
         }
-        if(socketByPlayer.has(stored.id)){
-          send(ws,{type:"error",message:"Character already connected"});
-          ws.close(1008,"Duplicate session");return;
+        // A valid guest bearer token may replace its own stale socket.
+        // Detach and persist the old session before creating the successor.
+        const previous=socketByPlayer.get(stored.id);
+        if(previous){
+          disconnect(previous);
+          previous.close(4002,"Session resumed elsewhere");
+          stored=fetchCharacter.get(hash(token))!;
         }
         ws.data.playerId=stored.id;ws.data.token=token;
         const player=world.add(stored.id,stored.name,stored.x,stored.z);

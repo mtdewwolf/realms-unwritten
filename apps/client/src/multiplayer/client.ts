@@ -4,6 +4,7 @@ import {WORLD_HALF_SIZE} from "../world/chunkedWorld";
 import type {InventoryState,RewardEvent} from "../ui/inventory";
 import type {QuestState,QuestResult} from "../ui/quests";
 import type {ProgressionState} from "../ui/character";
+import {HELLO_TIMEOUT_MS,MAX_RECONNECT_ATTEMPTS,reconnectDelay,shouldReconnect} from "./reconnectPolicy";
 
 interface PlayerState{id:string;name:string;x:number;z:number;heading:number}
 export interface ServerWolf{id:string;x:number;z:number;heading:number;health:number;maxHealth:number;phase:"idle"|"chase"|"windup"|"strike"|"dead";windupUntil:number}
@@ -23,22 +24,60 @@ export class MultiplayerClient {
   private readonly others=new Map<string,{mesh:THREE.Group;target:PlayerState}>();
   private lastSend=0;
   private online=false;
+  private targetUrl:string|null=null;
+  private autoReconnect=false;
+  private retries=0;
+  private retryTimer:ReturnType<typeof setTimeout>|null=null;
+  private helloTimer:ReturnType<typeof setTimeout>|null=null;
   constructor(private readonly scene:THREE.Scene,private readonly avatar:THREE.Group,private readonly status:(s:string)=>void,private readonly onCombat:(vitals:ServerVitals,wolf:ServerWolf|null)=>void,private readonly onActionResult:(result:CombatActionResult)=>void,private readonly onOffline:()=>void,private readonly onInventory:(state:InventoryState)=>void,private readonly onReward:(event:RewardEvent)=>void,private readonly onQuest:(quest:QuestState)=>void,private readonly onQuestResult:(result:QuestResult)=>void,private readonly onProgression:(state:ProgressionState)=>void,private readonly onResource:(result:{type:"resource_result";action:"gather"|"craft";ok:boolean;nodeId?:string;retryAfterMs?:number})=>void){}
   get connected():boolean{return this.online&&this.socket?.readyState===WebSocket.OPEN;}
   connect(url:string):void{
     this.disconnect();
-    this.sequence=0;this.actionSequence=0;this.lastSend=0;
     if(!/^wss?:\/\/\S+$/i.test(url)){this.status("Enter a valid ws:// or wss:// server URL");return;}
-    this.status("Connecting to multiplayer server…");
-    const ws=new WebSocket(url);
+    this.targetUrl=url;
+    this.autoReconnect=true;
+    this.retries=0;
+    this.openSocket();
+  }
+  private clearTimers():void{
+    if(this.retryTimer!==null){clearTimeout(this.retryTimer);this.retryTimer=null;}
+    if(this.helloTimer!==null){clearTimeout(this.helloTimer);this.helloTimer=null;}
+  }
+  private clearRemotePlayers():void{
+    for(const entry of this.others.values())this.scene.remove(entry.mesh);
+    this.others.clear();
+  }
+  private openSocket():void{
+    if(!this.autoReconnect||!this.targetUrl)return;
+    this.clearTimers();
+    this.sequence=0;this.actionSequence=0;this.lastSend=0;
+    this.status(this.retries?"Reconnecting · attempt "+this.retries+"/"+MAX_RECONNECT_ATTEMPTS:"Connecting to multiplayer server…");
+    let ws:WebSocket;
+    try{ws=new WebSocket(this.targetUrl);}
+    catch{
+      this.scheduleRetry(1006);
+      return;
+    }
     this.socket=ws;
-    ws.onopen=()=>ws.send(JSON.stringify({type:"hello",token:storedToken()||undefined,name:"Adventurer"}));
+    ws.onopen=()=>{
+      if(this.socket!==ws)return;
+      ws.send(JSON.stringify({type:"hello",token:storedToken()||undefined,name:"Adventurer"}));
+      this.helloTimer=setTimeout(()=>{if(this.socket===ws&&!this.online)ws.close(4000,"Join timeout");},HELLO_TIMEOUT_MS);
+    };
     ws.onmessage=event=>{
       let message:ServerMessage;
       try{message=JSON.parse(String(event.data)) as ServerMessage;}catch{return;}
-      if(message.type==="error"){this.status(message.message);return;}
+      if(message.type==="error"){
+        this.status(message.message);
+        if(message.message==="Unknown guest token"||message.message==="Character already connected"||message.message==="Send a valid hello packet"){
+          this.autoReconnect=false;
+        }
+        return;
+      }
       if(message.type==="welcome"){
-        if(message.protocol!==8){ws.close();this.status("Incompatible server protocol");return;}
+        if(message.protocol!==8){this.autoReconnect=false;ws.close(4004,"Incompatible protocol");this.status("Incompatible server protocol");return;}
+        if(this.helloTimer!==null){clearTimeout(this.helloTimer);this.helloTimer=null;}
+        this.retries=0;
         this.id=message.id;saveToken(message.token);this.online=true;
         this.avatar.position.x=message.player.x;this.avatar.position.z=message.player.z;
         this.status("Online · authoritative movement connected");return;
@@ -78,14 +117,28 @@ export class MultiplayerClient {
         }
       }
     };
-    ws.onerror=()=>this.status("Multiplayer connection unavailable");
-    ws.onclose=()=>{
+    ws.onerror=()=>{if(this.socket===ws)this.status("Connection interrupted");};
+    ws.onclose=event=>{
       if(this.socket!==ws)return;
-      this.online=false;this.id=null;this.status("Offline · local exploration mode");
+      this.socket=null;
+      this.online=false;this.id=null;
+      if(this.helloTimer!==null){clearTimeout(this.helloTimer);this.helloTimer=null;}
       this.onOffline();
-      for(const entry of this.others.values())this.scene.remove(entry.mesh);
-      this.others.clear();
+      this.clearRemotePlayers();
+      this.scheduleRetry(event.code);
     };
+  }
+  private scheduleRetry(closeCode:number):void{
+    if(!shouldReconnect(closeCode,this.retries,this.autoReconnect)){
+      this.autoReconnect=false;
+      this.status("Offline · connection stopped"+(this.retries>=MAX_RECONNECT_ATTEMPTS?" after retries":""));
+      return;
+    }
+    this.retries++;
+    const delay=reconnectDelay(this.retries);
+    this.status("Connection lost · reconnecting "+this.retries+"/"+MAX_RECONNECT_ATTEMPTS);
+    this.retryTimer=setTimeout(()=>{this.retryTimer=null;this.openSocket();},delay);
+  }
   }
   sendQuest(action:"status"|"accept"|"turnin"):boolean{
     if(!this.connected)return false;
@@ -140,10 +193,11 @@ export class MultiplayerClient {
     }
   }
   disconnect():void{
+    this.autoReconnect=false;this.targetUrl=null;this.retries=0;
+    this.clearTimers();
     const ws=this.socket;this.socket=null;this.online=false;this.id=null;
     this.onOffline();
-    if(ws){ws.onclose=null;ws.close();}
-    for(const entry of this.others.values())this.scene.remove(entry.mesh);
-    this.others.clear();
+    if(ws){ws.onclose=null;ws.close(1000,"User disconnected");}
+    this.clearRemotePlayers();
   }
 }
