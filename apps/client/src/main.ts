@@ -120,7 +120,7 @@ let abilityCooldownAt=0;
 const abilityLabels:Record<ClassId,string>={vanguard:"BULWARK",spellweaver:"ARC BOLT",shadeblade:"QUICKSTRIKE"};
 const abilityNames:Record<ClassId,"bulwark"|"arc-bolt"|"quickstrike">={vanguard:"bulwark",spellweaver:"arc-bolt",shadeblade:"quickstrike"};
 const multiplayer = new MultiplayerClient(scene, avatar,
-  text=>{status.textContent=text;},
+  text=>{status.textContent=text;if(title?.visible)title.message(text);},
   (vitals:ServerVitals,wolfState:ServerWolf|null)=>{
     playerHealth=vitals.health;playerStamina=vitals.stamina;
     hpDisplay.value=playerHealth;staminaDisplay.value=playerStamina;
