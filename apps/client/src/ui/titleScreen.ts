@@ -39,7 +39,7 @@ export class TitleScreen{
    });
   }
   el.querySelector("#realm-guest")!.addEventListener("click",()=>{this.pending=null;this.begin("guest");});
-  el.querySelector("#realm-offline")!.addEventListener("click",()=>{this.pending=null;this.hide();this.offline();});
+  el.querySelector("#realm-offline")!.addEventListener("click",()=>{this.pending=null;this.offline();this.hide();});
   try{this.url.value=localStorage.getItem("realms-unwritten-server-url")??"";}catch{/* no storage */}
  }
  private begin(mode:"account"|"guest"):void{
