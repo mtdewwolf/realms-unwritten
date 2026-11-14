@@ -1,5 +1,6 @@
 import {describe,expect,test} from "bun:test";
-import {closestOre,workshopDistance,missingMaterials,ORE_INTERACT_RANGE} from "../apps/client/src/ui/resourceGuidance";
+import {closestOre,closestResource,gatherRequest,workshopDistance,missingMaterials,ORE_INTERACT_RANGE} from "../apps/client/src/ui/resourceGuidance";
+import {herbsNear} from "../apps/client/src/world/herbs";
 import {landmarksNear} from "../apps/client/src/world/landmarks";
 describe("resource UX guidance",()=>{
  test("ore tracker returns real nearest POI and consistent range",()=>{
@@ -15,6 +16,20 @@ describe("resource UX guidance",()=>{
    expect(closestOre(NaN,0)).toBeNull();
    expect(closestOre(0,Infinity)).toBeNull();
    expect(closestOre(0,0,-5)).toBeNull();
+ });
+ test("gather uses the live position, not a stale tracker sample",()=>{
+   const herb=herbsNear(200,200,1500)[0];
+   expect(herb).toBeDefined();
+   const stale=closestResource(0,0);
+   expect(stale?.inRange).toBe(false);
+   const standing=gatherRequest({x:herb!.x,z:herb!.z},true);
+   expect(standing.send).toBe(true);
+   expect(standing.target?.id).toBe(herb!.id);
+   const away=gatherRequest({x:0,z:0},true);
+   expect(away.send).toBe(false);
+   expect(away.message).toContain("Move");
+   expect(gatherRequest({x:herb!.x,z:herb!.z},false).send).toBe(false);
+   expect(gatherRequest({x:Number.NaN,z:0},true).send).toBe(false);
  });
  test("workshop proximity and missing ingredients",()=>{
    expect(workshopDistance(2,-3)).toBe(0);

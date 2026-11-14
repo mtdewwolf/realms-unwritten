@@ -21,6 +21,8 @@ import { settlementsNear, discoverySettlements } from "./world/settlements";
 import { createWolf } from "./characters/rig";
 import { mountAnimatedAsset, type AnimatedAsset, type AnimationState } from "./characters/animatedAsset";
 import { pointerSpacing, zoomFromPinch } from "./input/touchCamera";
+import { movementWire } from "./multiplayer/prediction";
+import { gatherRequest } from "./ui/resourceGuidance";
 import { PLAYER_MAX_STAMINA, WOLF_MAX_HEALTH, ATTACK_STAMINA, DODGE_STAMINA, regenerateStamina, useStamina, withinAttackRange } from "./gameplay/combat";
 
 const app = document.querySelector<HTMLDivElement>("#app");
@@ -32,7 +34,7 @@ app.innerHTML = `
   <div id="world-coordinates">REGION 0,0</div>
   <div id="exploration">Discover the frontier</div>
   <div id="stick"><div id="knob"></div></div>
-  <div id="actions"><button id="gather">⛏<span>GATHER</span></button><button id="attack">⚔<span>ATTACK</span></button></div>
+  <div id="actions"><button id="gather" type="button">⛏<span>GATHER</span></button><button id="attack" type="button">⚔<span>ATTACK</span></button></div>
   <div id="hint">Left thumb to move · Drag open terrain to rotate · Pinch to zoom</div>
 `;
 
@@ -329,12 +331,10 @@ function dodge() {
 }
 document.querySelector("#attack")!.addEventListener("click", attack);
 document.querySelector("#gather")!.addEventListener("click", () => {
-  if(multiplayer.connected){
-    const target=resourceGuide.currentTarget();
-    if(target&&!target.inRange){status.textContent="Move "+Math.round(target.distance)+"m toward ore or tap TRACK ORE";return;}
-    multiplayer.sendGather();return;
-  }
-  status.textContent="Connect to the Bun server to mine Ironstone Outcrops.";
+  const sample=multiplayer.connected?multiplayer.authoritativePosition(performance.now()):{x:avatar.position.x,z:avatar.position.z};
+  const decision=gatherRequest(sample,multiplayer.connected);
+  if(!decision.send){status.textContent=decision.message??"Move closer to ore or Moonleaf.";return;}
+  if(!multiplayer.sendGather())status.textContent="Connect to the Bun server to mine Ironstone Outcrops.";
 });
 const dodgeButton = document.createElement("button");
 dodgeButton.id="dodge";
@@ -352,6 +352,9 @@ abilityButton.addEventListener("click",()=>{
 });
 let previous = performance.now();
 let elapsed = 0;
+const moveForward=new THREE.Vector3();
+const moveRight=new THREE.Vector3();
+const cameraOffset=new THREE.Vector3();
 function frame(now: number) {
   if(!app!.classList.contains("game-entered")){
     previous=now;
@@ -371,25 +374,23 @@ function frame(now: number) {
   const x = axisX + Number(keys.has("d")) - Number(keys.has("a"));
   const z = axisZ + Number(keys.has("s")) - Number(keys.has("w"));
   const length = Math.hypot(x, z);
-  const aliveForInput=multiplayer.connected?playerHealth>0:playerHealth>0;
-  if (length > 0.05 && playerHealth > 0) {
-    const forward = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw));
-    const right = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw));
-    const heading = right.multiplyScalar(x).addScaledVector(forward, -z).normalize();
-    if(!multiplayer.connected){
-      const next=moveWithCollision(avatar.position.x,avatar.position.z,heading.x*dt*5.5,heading.z*dt*5.5);
-      avatar.position.x=next.x;avatar.position.z=next.z;
-    }
+  const aliveForInput=playerHealth>0;
+  moveForward.set(-Math.sin(yaw),0,-Math.cos(yaw));
+  moveRight.set(Math.cos(yaw),0,-Math.sin(yaw));
+  const vx=moveRight.x*x+moveForward.x*(-z);
+  const vz=moveRight.z*x+moveForward.z*(-z);
+  if (length > 0.05 && aliveForInput && !multiplayer.connected) {
+    const headingLen=Math.hypot(vx,vz)||1;
+    const next=moveWithCollision(avatar.position.x,avatar.position.z,vx/headingLen*dt*5.5,vz/headingLen*dt*5.5);
+    avatar.position.x=next.x;avatar.position.z=next.z;
     avatar.position.x = THREE.MathUtils.clamp(avatar.position.x, -WORLD_HALF_SIZE+2, WORLD_HALF_SIZE-2);
     avatar.position.z = THREE.MathUtils.clamp(avatar.position.z, -WORLD_HALF_SIZE+2, WORLD_HALF_SIZE-2);
-    avatar.rotation.y = Math.atan2(heading.x, heading.z);
   }
+  if(length>0.05 && aliveForInput) avatar.rotation.y=Math.atan2(vx,vz);
   if(multiplayer.connected){
-    const rawForward=new THREE.Vector3(-Math.sin(yaw),0,-Math.cos(yaw));
-    const rawRight=new THREE.Vector3(Math.cos(yaw),0,-Math.sin(yaw));
-    const vec=rawRight.multiplyScalar(x).addScaledVector(rawForward,-z);
-    const magnitude=Math.hypot(vec.x,vec.z);
-    multiplayer.sendMovement({dx:magnitude>.05&&aliveForInput?vec.x/Math.max(1,magnitude):0,dz:magnitude>.05&&aliveForInput?vec.z/Math.max(1,magnitude):0},now);
+    const command=movementWire(vx,vz,aliveForInput);
+    multiplayer.predictLocal(command.dx,command.dz,dt,now);
+    multiplayer.sendMovement(command,now);
   }
   multiplayer.update(dt,groundHeightAt);
   adventurer.update(elapsed,length>0.05 && playerHealth>0,now/1000<attackingUntil);
@@ -439,10 +440,12 @@ function frame(now: number) {
   }
   avatar.position.y=groundHeightAt(avatar.position.x,avatar.position.z);
   atlas.update(avatar.position.x,avatar.position.z,now);
-  if(now-lastResourceUpdate>=500){
-    resourceGuide.update(avatar.position.x,avatar.position.z,multiplayer.connected,now);
-    const nearResource=resourceGuide.currentTarget()?.inRange===true;
-    const kind=resourceGuide.currentTarget()?.kind;
+  if(now-lastResourceUpdate>=100){
+    const sample=multiplayer.connected?multiplayer.authoritativePosition(now):{x:avatar.position.x,z:avatar.position.z};
+    resourceGuide.update(sample.x,sample.z,multiplayer.connected,now);
+    const decision=gatherRequest(sample,multiplayer.connected);
+    const nearResource=decision.send&&decision.target?.inRange===true;
+    const kind=decision.target?.kind;
     const gatherButton=document.querySelector<HTMLButtonElement>("#gather")!;
     gatherButton.querySelector("span")!.textContent=nearResource?(kind==="moonleaf"?"PICK":"MINE"):"GATHER";
     gatherButton.classList.toggle("action-context-ready",nearResource&&multiplayer.connected);
@@ -484,7 +487,7 @@ function frame(now: number) {
     exploration.textContent=closest?("Discoveries "+discovered.size+" | "+closest.name+" "+distance+"m"):("Discoveries "+discovered.size+" | Explore outward");
   }
   const pitch = THREE.MathUtils.degToRad(55);
-  const offset = new THREE.Vector3(
+  const offset = cameraOffset.set(
     Math.sin(yaw) * Math.cos(pitch),
     Math.sin(pitch),
     Math.cos(yaw) * Math.cos(pitch)
