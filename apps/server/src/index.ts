@@ -10,11 +10,14 @@ import {QuestStore,closeToGuard,parseQuestCommand} from "./quests";
 import {ProgressionStore} from "./progression";
 import {ResourceService} from "./resources";
 import {WolfRewardCoordinator} from "./wolfRewards";
+import {CharacterIdentityStore} from "./characterIdentity";
+import {parseCharacterCreation} from "../../shared/src/characterCatalog";
 import {PROTOCOL_VERSION,SIMULATION_HZ,SNAPSHOT_HZ,validateHello,type ServerMessage} from "./protocol";
 
 const dbFile=process.env.WORLD_DB_PATH||"data/realms-world.sqlite";
 if(dbFile!==":memory:")mkdirSync(dirname(dbFile),{recursive:true});
 const db=new Database(dbFile,{create:true});
+db.exec("PRAGMA foreign_keys=ON");
 db.exec("PRAGMA journal_mode = WAL; CREATE TABLE IF NOT EXISTS characters (id TEXT PRIMARY KEY, token_hash TEXT UNIQUE NOT NULL, name TEXT NOT NULL, x REAL NOT NULL, z REAL NOT NULL, updated_at INTEGER NOT NULL)");
 type Stored={id:string;name:string;x:number;z:number};
 const fetchCharacter=db.query<Stored,[string]>("SELECT id,name,x,z FROM characters WHERE token_hash = ?");
@@ -22,6 +25,7 @@ const insertCharacter=db.query("INSERT INTO characters (id,token_hash,name,x,z,u
 const saveCharacter=db.query("UPDATE characters SET x=?,z=?,updated_at=? WHERE id=?");
 const world=new WorldSimulation();
 const combat=new CombatSimulation(world);
+const identityStore=new CharacterIdentityStore(db);
 const inventory=new InventoryStore(db);
 const progression=new ProgressionStore(db);
 const quests=new QuestStore(db,progression,inventory);
@@ -85,18 +89,31 @@ const server=Bun.serve<Session>({
       let packet:unknown;
       try{packet=JSON.parse(message);}catch{return;}
       if(!ws.data.playerId){
-        const hello=validateHello(packet);
-        if(!hello){send(ws,{type:"error",message:"Send a valid hello packet"});return;}
-        let token=hello.token||randomBytes(32).toString("base64url");
-        let stored=fetchCharacter.get(hash(token));
-        if(!stored){
-          if(hello.token){send(ws,{type:"error",message:"Unknown guest token"});ws.close(1008,"Invalid credentials");return;}
+        const kind=(packet as {type?:unknown})?.type;
+        let stored:Stored;
+        let token:string;
+        if(kind==="create_character"){
+          const created=parseCharacterCreation(packet);
+          if(!created){send(ws,{type:"creation_result",ok:false,reason:"Invalid name, faction, race or class"});return;}
+          token=randomBytes(32).toString("base64url");
           const id=randomUUID();
-          stored={id,name:hello.name||"Adventurer",x:0,z:0};
-          insertCharacter.run(id,hash(token),stored.name,0,0,Date.now());
+          const createTx=db.transaction(()=>{
+            insertCharacter.run(id,hash(token),created.name,0,0,Date.now());
+            identityStore.assign(id,created);
+          });
+          createTx();
+          stored={id,name:created.name,x:0,z:0};
+        }else{
+          const hello=validateHello(packet);
+          if(!hello){send(ws,{type:"error",message:"Send a valid hello packet"});return;}
+          if(!hello.token){send(ws,{type:"creation_required"});return;}
+          token=hello.token;
+          const existing=fetchCharacter.get(hash(token));
+          if(!existing){send(ws,{type:"error",message:"Unknown guest token"});ws.close(1008,"Invalid credentials");return;}
+          stored=existing;
+          // Existing pre-creation guest characters keep their identity and progress.
+          identityStore.migrateLegacy(stored.id);
         }
-        // A valid guest bearer token may replace its own stale socket.
-        // Detach and persist the old session before creating the successor.
         const previous=socketByPlayer.get(stored.id);
         if(previous){
           disconnect(previous);
@@ -107,7 +124,7 @@ const server=Bun.serve<Session>({
         const player=world.add(stored.id,stored.name,stored.x,stored.z);
         combat.join(stored.id);
         socketByPlayer.set(stored.id,ws);
-        send(ws,{type:"welcome",protocol:PROTOCOL_VERSION,id:stored.id,token,player:view(player)});
+        send(ws,{type:"welcome",protocol:PROTOCOL_VERSION,id:stored.id,token,player:view(player),character:identityStore.read(stored.id)!});
         send(ws,inventory.read(stored.id));
         send(ws,quests.status(stored.id));
         send(ws,progression.read(stored.id));

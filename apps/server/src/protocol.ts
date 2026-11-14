@@ -1,5 +1,6 @@
 /** Wire format v1. Do not treat client messages as authoritative positions. */
-export const PROTOCOL_VERSION=8;
+import type {CharacterIdentity} from "../../shared/src/characterCatalog";
+export const PROTOCOL_VERSION=9;
 export const MOVEMENT_SPEED=5.5;
 export const WORLD_HALF_EXTENT=8192;
 export const AOI_RADIUS=160;
@@ -8,9 +9,9 @@ export const SNAPSHOT_HZ=10;
 export interface InputMessage {type:"input";seq:number;dx:number;dz:number}
 export interface HelloMessage {type:"hello";token?:string;name?:string}
 export type CombatActionMessage={type:"action";seq:number;action:"attack"|"dodge";target?:string};
-export type ClientMessage=InputMessage|HelloMessage|CombatActionMessage|{type:"inventory"}|{type:"progression"}|{type:"equip";item:"starter-sword"|"fangblade"|"ironblade"}|{type:"use";item:"healing-tonic"}|{type:"gather"}|{type:"craft";recipe:"ironblade"|"healing-tonic"}|{type:"quest";action:"status"|"accept"|"turnin";id?:"verdant-wolf-hunt"};
+export type ClientMessage=InputMessage|HelloMessage|{type:"create_character";name:string;faction:CharacterIdentity["faction"];race:CharacterIdentity["race"];characterClass:CharacterIdentity["characterClass"]}|CombatActionMessage|{type:"inventory"}|{type:"progression"}|{type:"equip";item:"starter-sword"|"fangblade"|"ironblade"}|{type:"use";item:"healing-tonic"}|{type:"gather"}|{type:"craft";recipe:"ironblade"|"healing-tonic"}|{type:"quest";action:"status"|"accept"|"turnin";id?:"verdant-wolf-hunt"};
 export interface PlayerState {id:string;name:string;x:number;z:number;heading:number}
-export interface WelcomeMessage {type:"welcome";protocol:8;id:string;token:string;player:PlayerState}
+export interface WelcomeMessage {type:"welcome";protocol:9;id:string;token:string;player:PlayerState;character:CharacterIdentity}
 export interface CombatVital {health:number;stamina:number;maxHealth:number;maxStamina:number;alive:boolean}
 export interface CombatWolf {id:string;x:number;z:number;heading:number;health:number;maxHealth:number;phase:"idle"|"chase"|"windup"|"strike"|"dead";windupUntil:number}
 export interface SnapshotMessage {type:"snapshot";tick:number;you:PlayerState;others:PlayerState[];ack:number;vitals:CombatVital;wolf:CombatWolf|null}
@@ -25,7 +26,9 @@ export interface QuestResultMessage{type:"quest_result";action:"status"|"accept"
 export interface ProgressionMessage{type:"progression";xp:number;level:number;nextLevelXp:number|null;attributes:{strength:number;vitality:number;agility:number}}
 export interface ResourceResultMessage{type:"resource_result";action:"gather"|"craft";ok:boolean;reason?:string;nodeId?:string;item?:string;amount?:number;retryAfterMs?:number;resource?:"ore"|"moonleaf"|"tonic"}
 export interface UseResultMessage{type:"use_result";ok:boolean;reason?:string;item?:string;health?:number}
-export type ServerMessage=WelcomeMessage|SnapshotMessage|CombatActionResult|InventoryMessage|RewardMessage|QuestStatusMessage|QuestResultMessage|ProgressionMessage|EquipResult|ResourceResultMessage|UseResultMessage|{type:"error";message:string};
+export type CreationRequiredMessage={type:"creation_required"};
+export type CreationResultMessage={type:"creation_result";ok:false;reason:string};
+export type ServerMessage=CreationRequiredMessage|CreationResultMessage|WelcomeMessage|SnapshotMessage|CombatActionResult|InventoryMessage|RewardMessage|QuestStatusMessage|QuestResultMessage|ProgressionMessage|EquipResult|ResourceResultMessage|UseResultMessage|{type:"error";message:string};
 export function validateInput(input:unknown):InputMessage|null{
   if(!input||typeof input!=="object")return null;
   const m=input as Record<string,unknown>;
