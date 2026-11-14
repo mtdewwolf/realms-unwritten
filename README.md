@@ -279,6 +279,10 @@ Bun now enforces **circle-versus-rectangle collisions** against the three Verdan
 
 Android now retries transient WebSocket disconnects with six bounded exponential attempts (500ms through 12s), an 8s join timeout, and automatic rejoin with the existing guest token. Explicit OFFLINE, incompatible protocol, and invalid credentials stop retries. Successful reconnection resets movement/action sequences, restores server position, and reloads inventory, quests and XP. Bun permits a valid guest token to take over its own older session: the previous session is saved/detached before replacement, preventing duplicate active characters. This protects against stale sockets after a brief network interruption, but is **not secure account authentication**; anyone possessing the guest bearer token can take over that character. See [Reconnection Architecture](docs/RECONNECTION.md).
 
+### Atomic wolf reward settlement
+
+Wolf kill loot, coins, quest progress and XP now commit together in one SQLite transaction per contributor, with rollback on failure and duplicate-event protection. See [Atomic Wolf Rewards](docs/ATOMIC_WOLF_REWARDS.md). This does not yet provide durable notification replay or transactional consumable health persistence.
+
 ### Guest persistence
 
 - SQLite via Bun's `bun:sqlite`.

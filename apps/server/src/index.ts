@@ -9,6 +9,7 @@ import {InventoryStore} from "./inventory";
 import {QuestStore,closeToGuard,parseQuestCommand} from "./quests";
 import {ProgressionStore} from "./progression";
 import {ResourceService} from "./resources";
+import {WolfRewardCoordinator} from "./wolfRewards";
 import {PROTOCOL_VERSION,SIMULATION_HZ,SNAPSHOT_HZ,validateHello,type ServerMessage} from "./protocol";
 
 const dbFile=process.env.WORLD_DB_PATH||"data/realms-world.sqlite";
@@ -25,20 +26,21 @@ const inventory=new InventoryStore(db);
 const progression=new ProgressionStore(db);
 const quests=new QuestStore(db,progression,inventory);
 const resources=new ResourceService(db,inventory);
+const wolfRewards=new WolfRewardCoordinator(db,inventory,quests,progression);
 combat.resolveAttackDamage=id=>20+Math.floor((progression.read(id).attributes.strength-5)/2)+inventory.equipped(id).bonusDamage;
 type Session={playerId:string|null; token:string|null; lastInputAt:number;messages:number; windowStart:number};
 const socketByPlayer=new Map<string,ServerWebSocket<Session>>();
 const hash=(token:string)=>createHash("sha256").update(token).digest("hex");
 combat.onWolfDefeated=(eventId,contributors)=>{
   for(const id of contributors){
+    const result=wolfRewards.grant(id,eventId);
+    if(!result)continue;
     const ws=socketByPlayer.get(id);
     if(!ws)continue;
-    const reward=inventory.grantWolfKill(eventId,id);
-    if(!reward)continue;
-    send(ws,reward);
+    send(ws,result.reward);
     send(ws,inventory.read(id));
-    if(quests.recordWolfKill(id,eventId))send(ws,quests.status(id));
-    if(progression.grantWolfKill(id,eventId))send(ws,progression.read(id));
+    if(result.questAdvanced)send(ws,quests.status(id));
+    if(result.xpGranted)send(ws,progression.read(id));
   }
 };
 const save=(id:string)=>{
