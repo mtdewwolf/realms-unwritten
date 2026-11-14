@@ -1,18 +1,20 @@
 import * as THREE from "three";
+import {paintedTexture} from "./paintedTextures";
 /**
  * Realms Unwritten original architectural kit v2.
  * Painted-fantasy silhouettes, layered roof shingles, carved timber and warm windows.
  * Building collision stays the original 3x3-meter footprint.
  */
-const plaster=new THREE.MeshLambertMaterial({color:0xd4c49f,flatShading:true});
-const foundation=new THREE.MeshLambertMaterial({color:0x74776b,flatShading:true});
-const timber=new THREE.MeshLambertMaterial({color:0x5a4032,flatShading:true});
-const timberHighlight=new THREE.MeshLambertMaterial({color:0x91714c,flatShading:true});
-const roofSlate=[0x425c69,0x526778,0x35515a,0x61727b].map(c=>new THREE.MeshLambertMaterial({color:c,flatShading:true}));
+const plaster=new THREE.MeshLambertMaterial({color:0xd4c49f,flatShading:true,map:paintedTexture("plaster")});
+const foundation=new THREE.MeshLambertMaterial({color:0x74776b,flatShading:true,map:paintedTexture("stone")});
+const timber=new THREE.MeshLambertMaterial({color:0x5a4032,flatShading:true,map:paintedTexture("timber")});
+const timberHighlight=new THREE.MeshLambertMaterial({color:0x91714c,flatShading:true,map:paintedTexture("timber")});
+const sharedSlate=paintedTexture("slate");
+const roofSlate=[0x425c69,0x526778,0x35515a,0x61727b].map(c=>new THREE.MeshLambertMaterial({color:c,flatShading:true,map:sharedSlate}));
 const warmGlow=new THREE.MeshBasicMaterial({color:0xffc874});
 const windowFrame=new THREE.MeshLambertMaterial({color:0x3c2928});
 const copper=new THREE.MeshLambertMaterial({color:0xc2a15d,flatShading:true});
-const stone=new THREE.MeshLambertMaterial({color:0x8b9082,flatShading:true});
+const stone=new THREE.MeshLambertMaterial({color:0x8b9082,flatShading:true,map:paintedTexture("stone")});
 function part(parent:THREE.Object3D,geometry:THREE.BufferGeometry,mat:THREE.Material,x:number,y:number,z:number):THREE.Mesh{
  const mesh=new THREE.Mesh(geometry,mat);mesh.position.set(x,y,z);parent.add(mesh);return mesh;
 }
