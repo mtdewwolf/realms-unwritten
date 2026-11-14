@@ -5,6 +5,7 @@ describe("character and wolf asset wiring",()=>{
    const source=readFileSync("apps/client/src/main.ts","utf8");
    expect(source).toContain('createRaceCharacter(identity)');
    expect(source).toContain('"/assets/wolf.glb"');
+   expect(source).toContain("createAnimatedRace(identity)");
    expect(source).not.toContain('mountAnimatedAsset(avatar, adventurer.root');
  });
  test("race mesh has a live creator preview and server-owned identity",()=>{
@@ -12,5 +13,6 @@ describe("character and wolf asset wiring",()=>{
    const client=readFileSync("apps/client/src/multiplayer/client.ts","utf8");
    expect(creator).toContain("new RacePreview(");
    expect(client).toContain("createRaceCharacter(other.character");
+   expect(client).toContain("createAnimatedRace(identity)");
  });
 });

@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import {createRaceCharacter,type RaceCharacter} from "../characters/raceModel";
+import {createAnimatedRace,type AnimatedRace} from "../characters/raceAsset";
 import {DEFAULT_APPEARANCE} from "../../../shared/src/characterCatalog";
 import {WORLD_HALF_SIZE} from "../world/chunkedWorld";
 import type {InventoryState,RewardEvent} from "../ui/inventory";
@@ -27,7 +28,7 @@ export class MultiplayerClient {
   private id:string|null=null;
   private sequence=0;
   private actionSequence=0;
-  private readonly others=new Map<string,{mesh:THREE.Group;model:RaceCharacter;target:PlayerState}>();
+  private readonly others=new Map<string,{mesh:THREE.Group;model:RaceCharacter;target:PlayerState;rigged?:AnimatedRace}>();
   private lastSend=0;
   private online=false;
   private targetUrl:string|null=null;
@@ -54,7 +55,7 @@ export class MultiplayerClient {
     if(this.helloTimer!==null){clearTimeout(this.helloTimer);this.helloTimer=null;}
   }
   private clearRemotePlayers():void{
-    for(const entry of this.others.values()){this.scene.remove(entry.mesh);entry.model.dispose();}
+    for(const entry of this.others.values()){this.scene.remove(entry.mesh);entry.model.dispose();entry.rigged?.dispose();}
     this.others.clear();
   }
   private openSocket():void{
@@ -134,15 +135,20 @@ export class MultiplayerClient {
           let entry=this.others.get(other.id);
           if(!entry){
             const model=createRaceCharacter(other.character??{race:"sunborne",characterClass:"vanguard",appearance:DEFAULT_APPEARANCE});
-            const mesh=model.root;
-            mesh.position.set(other.x,0,other.z);
-            this.scene.add(mesh);
+            const mesh=new THREE.Group();mesh.add(model.root);
+            mesh.position.set(other.x,0,other.z);this.scene.add(mesh);
             entry={mesh,model,target:other};this.others.set(other.id,entry);
+            const remoteEntry=entry;
+            const identity=other.character??{race:"sunborne" as const,characterClass:"vanguard" as const,appearance:DEFAULT_APPEARANCE};
+            void createAnimatedRace(identity).then(rig=>{
+              if(this.others.get(other.id)!==remoteEntry){rig.dispose();return;}
+              remoteEntry.rigged=rig;remoteEntry.mesh.add(rig.root);remoteEntry.model.root.visible=false;
+            }).catch(error=>console.warn("Remote race fallback",error));
           }
           entry.target=other;
         }
         for(const [id,entry] of this.others)if(!visible.has(id)){
-          this.scene.remove(entry.mesh);entry.model.dispose();this.others.delete(id);
+          this.scene.remove(entry.mesh);entry.model.dispose();entry.rigged?.dispose();this.others.delete(id);
         }
       }
     };
@@ -240,7 +246,9 @@ export class MultiplayerClient {
       entry.mesh.position.z+=(p.z-entry.mesh.position.z)*smoothing;
       entry.mesh.position.y=groundHeightAt(entry.mesh.position.x,entry.mesh.position.z);
       entry.mesh.rotation.y=p.heading;
-      entry.model.update(performance.now()/1000,Math.hypot(p.x-entry.mesh.position.x,p.z-entry.mesh.position.z)>.05,false);
+      const moving=Math.hypot(p.x-entry.mesh.position.x,p.z-entry.mesh.position.z)>.05;
+      entry.model.update(performance.now()/1000,moving,false);
+      entry.rigged?.setState(moving?"walk":"idle");entry.rigged?.update(dt);
     }
   }
   disconnect():void{

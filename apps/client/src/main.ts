@@ -15,6 +15,7 @@ import { GameMenu } from "./ui/gameMenu";
 import { CharacterCreator } from "./ui/characterCreator";
 import {TitleScreen} from "./ui/titleScreen";
 import {createRaceCharacter} from "./characters/raceModel";
+import {createAnimatedRace,type AnimatedRace} from "./characters/raceAsset";
 import {DEFAULT_APPEARANCE,type ClassId} from "../../shared/src/characterCatalog";
 import { moveWithCollision } from "./world/collision";
 import { settlementsNear, discoverySettlements } from "./world/settlements";
@@ -67,7 +68,8 @@ const fallbackWolf = createWolf();
 wolf.add(fallbackWolf);
 wolf.position.set(5, 0, 5);
 scene.add(wolf);
-let playerAsset: AnimatedAsset | null = null;
+let riggedPlayer:AnimatedRace|null=null;
+let rigGeneration=0;
 let wolfAsset: AnimatedAsset | null = null;
 // Procedural race avatars remain visible; the generic GLB would hide the selected race.
 mountAnimatedAsset(wolf, fallbackWolf, "/assets/wolf.glb", ["idle","walk","attack","death"])
@@ -164,6 +166,12 @@ const multiplayer = new MultiplayerClient(scene, avatar,
     creator.hide();title.hide();app.classList.add("game-entered");characterPanel.setIdentity(identity);
     avatar.remove(adventurer.root);adventurer.dispose();
     adventurer=createRaceCharacter(identity);avatar.add(adventurer.root);
+    const generation=++rigGeneration;
+    if(riggedPlayer){avatar.remove(riggedPlayer.root);riggedPlayer.dispose();riggedPlayer=null;}
+    void createAnimatedRace(identity).then(rig=>{
+      if(generation!==rigGeneration){rig.dispose();return;}
+      riggedPlayer=rig;avatar.add(rig.root);adventurer.root.visible=false;
+    }).catch(error=>console.warn("Using procedural race fallback",error));
     activeClass=identity.characterClass;
     abilityCooldownAt=0;
     const control=document.querySelector<HTMLButtonElement>("#class-ability");
@@ -395,8 +403,8 @@ function frame(now: number) {
   adventurer.update(elapsed,length>0.05 && playerHealth>0,now/1000<attackingUntil);
   const playerState: AnimationState = now/1000<attackingUntil ? "attack" :
     now/1000<dodgeUntil ? "dodge" : length>0.05 && playerHealth>0 ? "walk" : "idle";
-  playerAsset?.setState(playerState);
-  playerAsset?.update(dt);
+  riggedPlayer?.setState(playerState);
+  riggedPlayer?.update(dt);
   const wolfDistance = Math.hypot(avatar.position.x-wolf.position.x,avatar.position.z-wolf.position.z);
   const wolfState: AnimationState = wolfHealth<=0 ? "death" :
     now/1000<wolfAttackAnimationUntil ? "attack" :
