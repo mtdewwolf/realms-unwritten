@@ -1,3 +1,4 @@
+import {FACTIONS,RACES,CLASSES,type CharacterIdentity} from "../../../shared/src/characterCatalog";
 export interface ProgressionState{
   type:"progression";
   xp:number;
@@ -12,6 +13,7 @@ export class CharacterPanel {
   private readonly progress:HTMLProgressElement;
   private readonly stats:HTMLElement;
   private lastLevel:number|null=null;
+  private readonly lineage:HTMLElement;
   constructor(host:HTMLElement,private readonly refresh:()=>void){
     this.button=document.createElement("button");
     this.button.id="character-toggle";
@@ -22,9 +24,10 @@ export class CharacterPanel {
     this.panel=document.createElement("section");
     this.panel.id="character-panel";this.panel.hidden=true;
     this.panel.setAttribute("aria-label","Character progression");
-    this.panel.innerHTML='<div class="character-heading"><strong>ADVENTURER</strong><button type="button" id="character-close">✕</button></div><p id="character-level">Connect to view your character.</p><progress id="character-xp" max="100" value="0"></progress><div id="character-stats"></div><p class="character-note">XP and levels are saved on the Bun server. Attributes are visible now; combat scaling and equipment arrive later.</p>';
+    this.panel.innerHTML='<div class="character-heading"><strong>ADVENTURER</strong><button type="button" id="character-close">✕</button></div><p id="character-lineage"></p><p id="character-level">Connect to view your character.</p><progress id="character-xp" max="100" value="0"></progress><div id="character-stats"></div><p class="character-note">XP and levels are saved on the Bun server. Attributes are visible now; combat scaling and equipment arrive later.</p>';
     host.appendChild(this.panel);
     this.info=this.panel.querySelector<HTMLElement>("#character-level")!;
+    this.lineage=this.panel.querySelector<HTMLElement>("#character-lineage")!;
     this.progress=this.panel.querySelector<HTMLProgressElement>("#character-xp")!;
     this.stats=this.panel.querySelector<HTMLElement>("#character-stats")!;
     this.button.addEventListener("click",()=>{
@@ -33,6 +36,9 @@ export class CharacterPanel {
     });
     this.panel.querySelector("#character-close")!.addEventListener("click",()=>this.panel.hidden=true);
     this.offline();
+  }
+  setIdentity(i:CharacterIdentity):void{
+    this.lineage.textContent=i.name+" · "+RACES[i.race].name+" "+CLASSES[i.characterClass].name+" · "+FACTIONS[i.faction].name;
   }
   update(p:ProgressionState):number|null{
     const previous=this.lastLevel;
@@ -53,6 +59,7 @@ export class CharacterPanel {
   }
   offline():void{
     this.lastLevel=null;
+    this.lineage.textContent="";
     this.info.textContent="Connect to the game server to view progression.";
     this.progress.max=100;this.progress.value=0;
     this.stats.textContent="Character stats unavailable offline.";

@@ -214,7 +214,7 @@ Server entry point: `apps/server/src/index.ts`. Core movement: `simulation.ts`. 
 - `GET /ws` with WebSocket upgrade: multiplayer connection.
 - Default port: **3001**; configurable via `PORT`.
 - Bind address: `0.0.0.0` by default; override via `HOST`.
-- Protocol version: **8** (client/server must use matching builds).
+- Protocol version: **9** (client/server must use matching builds).
 - Clients send `hello` with an optional existing guest token and optional sanitized display name; server sends `welcome` with player ID, token, initial position.
 - Clients send numbered movement vectors, not positions; server clamps speed and world bounds.
 - Server returns `snapshot` containing own authoritative position, acknowledgment sequence and nearby players.
@@ -282,6 +282,10 @@ Android now retries transient WebSocket disconnects with six bounded exponential
 ### Atomic wolf reward settlement
 
 Wolf kill loot, coins, quest progress and XP now commit together in one SQLite transaction per contributor, with rollback on failure and duplicate-event protection. See [Atomic Wolf Rewards](docs/ATOMIC_WOLF_REWARDS.md). This does not yet provide durable notification replay or transactional consumable health persistence.
+
+### Character creation: factions, races and classes
+
+New online guests now enter a character creator before the Bun server admits them to the world. Select **The Radiant Accord** (Sunborne or Thornkin) or **The Umbral Dominion** (Ashforged or Veilkin), then pick Vanguard, Spellweaver or Shadeblade and a name. Bun validates names and faction/race combinations and saves the immutable character identity in SQLite. Reconnect restores the same identity. Pre-existing guest characters are migrated automatically to the Sunborne Vanguard default without losing their token or progress. The Android HERO sheet displays lineage. Faction reputation, class abilities, PvP rules and distinct 3D race models are **not yet implemented**. Protocol v9. See [Character Creation](docs/CHARACTER_CREATION.md).
 
 ### Guest persistence
 
@@ -529,7 +533,7 @@ Run this in addition to `bun test`; it is not a normal `test/*.test.ts` unit tes
    curl -fsS http://127.0.0.1:3001/health
    ```
 
-3. Verify response has `"ok":true`, protocol version `8`, and the online player count.
+3. Verify response has `"ok":true`, protocol version `9`, and the online player count.
 4. Open the client and connect to `ws://127.0.0.1:3001/ws` (when client and server are on the same machine).
 5. Confirm the connection-status message switches to online. Disconnect and verify offline exploration continues.
 6. In the terminal, check for runtime exceptions and ensure the server remains running.
@@ -687,7 +691,7 @@ adb logcat > android-session.log
 - [ ] Android Gradle `assembleDebug` succeeds and artifact exists.
 - [ ] Offline exploration still works.
 - [ ] Two distinct guest clients can connect and see movement.
-- [ ] In protocol v8, they agree on shared wolf HP/phase and rejected forged attacks.
+- [ ] In protocol v9, they agree on shared wolf HP/phase and rejected forged attacks.
 - [ ] Position persistence survives a graceful restart.
 - [ ] World chunks, road geometry, map and discovery states remain stable.
 - [ ] Real Android device boot/controls/performance verified for release candidates.

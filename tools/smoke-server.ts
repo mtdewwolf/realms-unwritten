@@ -20,6 +20,7 @@ async function connect():Promise<{socket:WebSocket;welcome:any}>{
     socket.addEventListener("open",()=>socket.send(JSON.stringify({type:"hello",name:"Test Adventurer"})));
     socket.addEventListener("message",e=>{
       const packet=JSON.parse(String(e.data));
+      if(packet.type==="creation_required")socket.send(JSON.stringify({type:"create_character",name:"Test Adventurer",faction:"radiant-accord",race:"sunborne",characterClass:"vanguard"}));
       if(packet.type==="welcome"){clearTimeout(timeout);resolve(packet);}
     });
   });
@@ -38,6 +39,7 @@ async function run(){
   if(!healthy)throw new Error("Server /health failed");
   const first=await connect(),second=await connect();
   if(first.welcome.id===second.welcome.id)throw new Error("Distinct guests shared an identity");
+  if(first.welcome.character.race!=="sunborne"||first.welcome.character.characterClass!=="vanguard")throw Error("Character creation did not persist");
   const target=new Promise<void>((resolve,reject)=>{
     const timer=setTimeout(()=>reject(new Error("Player movement did not replicate")),3500);
     second.socket.addEventListener("message",e=>{
@@ -140,6 +142,7 @@ async function run(){
   });
   const recovered=await resumed;
   if(recovered.id!==first.welcome.id)throw Error("Reconnect minted a new character");
+  if(JSON.stringify(recovered.character)!==JSON.stringify(first.welcome.character))throw Error("Reconnect lost character identity");
   if(recovered.player.x<.1)throw Error("Reconnect lost the last authoritative position");
   const health=await (await fetch("http://127.0.0.1:"+port+"/health")).json() as {players:number};
   if(health.players!==2)throw Error("Reconnect created a duplicate active player");

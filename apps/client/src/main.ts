@@ -11,6 +11,7 @@ import { QuestPanel } from "./ui/quests";
 import { CharacterPanel } from "./ui/character";
 import { ResourceGuide } from "./ui/resourceGuide";
 import { GameMenu } from "./ui/gameMenu";
+import { CharacterCreator } from "./ui/characterCreator";
 import { moveWithCollision } from "./world/collision";
 import { settlementsNear, discoverySettlements } from "./world/settlements";
 import { createAdventurer, createWolf } from "./characters/rig";
@@ -127,6 +128,7 @@ let lastResourceUpdate=0;
 const inventoryPanel=new InventoryPanel(app,item=>multiplayer.sendEquip(item),recipe=>multiplayer.sendCraft(recipe),()=>multiplayer.useTonic());
 const questPanel=new QuestPanel(app,scene,action=>multiplayer.sendQuest(action));
 const characterPanel=new CharacterPanel(app,()=>multiplayer.requestProgression());
+const creator=new CharacterCreator(app,choice=>multiplayer.createCharacter(choice));
 inventoryPanel.button.addEventListener("click",()=>multiplayer.requestInventory());
 let onlineWolf:ServerWolf|null=null;
 let lastServerStrikePhase="";
@@ -167,7 +169,9 @@ const multiplayer = new MultiplayerClient(scene, avatar,
   quest=>questPanel.update(quest),
   result=>{questPanel.result(result);if(result.ok&&result.action==="turnin")status.textContent="Wolf Hunt complete · +25 coins";},
   state=>{const newLevel=characterPanel.update(state);if(newLevel!==null)status.textContent="Level up! You reached level "+newLevel;},
-  result=>{if(result.action==="gather"&&result.nodeId&&result.retryAfterMs)resourceGuide.markCooldown(result.nodeId,result.retryAfterMs);}
+  result=>{if(result.action==="gather"&&result.nodeId&&result.retryAfterMs)resourceGuide.markCooldown(result.nodeId,result.retryAfterMs);},
+  ()=>creator.show(),
+  identity=>{creator.hide();characterPanel.setIdentity(identity);}
 );
 const multiplayerPanel=document.createElement("div");
 multiplayerPanel.id="multiplayer-panel";
