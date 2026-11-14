@@ -1,5 +1,6 @@
 import * as THREE from "three";
-import {createAdventurer} from "../characters/rig";
+import {createRaceCharacter,type RaceCharacter} from "../characters/raceModel";
+import {DEFAULT_APPEARANCE} from "../../../shared/src/characterCatalog";
 import {WORLD_HALF_SIZE} from "../world/chunkedWorld";
 import type {InventoryState,RewardEvent} from "../ui/inventory";
 import type {QuestState,QuestResult} from "../ui/quests";
@@ -7,7 +8,7 @@ import type {ProgressionState} from "../ui/character";
 import {HELLO_TIMEOUT_MS,MAX_RECONNECT_ATTEMPTS,reconnectDelay,shouldReconnect} from "./reconnectPolicy";
 import type {CharacterCreation,CharacterIdentity} from "../../../shared/src/characterCatalog";
 
-interface PlayerState{id:string;name:string;x:number;z:number;heading:number}
+interface PlayerState{id:string;name:string;x:number;z:number;heading:number;character?:CharacterIdentity}
 export interface ServerWolf{id:string;x:number;z:number;heading:number;health:number;maxHealth:number;phase:"idle"|"chase"|"windup"|"strike"|"dead";windupUntil:number}
 export interface ServerVitals{health:number;stamina:number;maxHealth:number;maxStamina:number;alive:boolean}
 interface Snapshot{type:"snapshot";tick:number;you:PlayerState;others:PlayerState[];ack:number;vitals:ServerVitals;wolf:ServerWolf|null}
@@ -22,7 +23,7 @@ export class MultiplayerClient {
   private id:string|null=null;
   private sequence=0;
   private actionSequence=0;
-  private readonly others=new Map<string,{mesh:THREE.Group;target:PlayerState}>();
+  private readonly others=new Map<string,{mesh:THREE.Group;model:RaceCharacter;target:PlayerState}>();
   private lastSend=0;
   private online=false;
   private targetUrl:string|null=null;
@@ -45,7 +46,7 @@ export class MultiplayerClient {
     if(this.helloTimer!==null){clearTimeout(this.helloTimer);this.helloTimer=null;}
   }
   private clearRemotePlayers():void{
-    for(const entry of this.others.values())this.scene.remove(entry.mesh);
+    for(const entry of this.others.values()){this.scene.remove(entry.mesh);entry.model.dispose();}
     this.others.clear();
   }
   private openSocket():void{
@@ -112,15 +113,16 @@ export class MultiplayerClient {
           visible.add(other.id);
           let entry=this.others.get(other.id);
           if(!entry){
-            const mesh=createAdventurer().root;
+            const model=createRaceCharacter(other.character??{race:"sunborne",characterClass:"vanguard",appearance:DEFAULT_APPEARANCE});
+            const mesh=model.root;
             mesh.position.set(other.x,0,other.z);
             this.scene.add(mesh);
-            entry={mesh,target:other};this.others.set(other.id,entry);
+            entry={mesh,model,target:other};this.others.set(other.id,entry);
           }
           entry.target=other;
         }
         for(const [id,entry] of this.others)if(!visible.has(id)){
-          this.scene.remove(entry.mesh);this.others.delete(id);
+          this.scene.remove(entry.mesh);entry.model.dispose();this.others.delete(id);
         }
       }
     };
@@ -204,6 +206,7 @@ export class MultiplayerClient {
       entry.mesh.position.z+=(p.z-entry.mesh.position.z)*smoothing;
       entry.mesh.position.y=groundHeightAt(entry.mesh.position.x,entry.mesh.position.z);
       entry.mesh.rotation.y=p.heading;
+      entry.model.update(performance.now()/1000,Math.hypot(p.x-entry.mesh.position.x,p.z-entry.mesh.position.z)>.05,false);
     }
   }
   disconnect():void{

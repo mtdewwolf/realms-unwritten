@@ -10,7 +10,7 @@ export interface InputMessage {type:"input";seq:number;dx:number;dz:number}
 export interface HelloMessage {type:"hello";token?:string;name?:string}
 export type CombatActionMessage={type:"action";seq:number;action:"attack"|"dodge";target?:string};
 export type ClientMessage=InputMessage|HelloMessage|{type:"create_character";name:string;faction:CharacterIdentity["faction"];race:CharacterIdentity["race"];characterClass:CharacterIdentity["characterClass"]}|CombatActionMessage|{type:"inventory"}|{type:"progression"}|{type:"equip";item:"starter-sword"|"fangblade"|"ironblade"}|{type:"use";item:"healing-tonic"}|{type:"gather"}|{type:"craft";recipe:"ironblade"|"healing-tonic"}|{type:"quest";action:"status"|"accept"|"turnin";id?:"verdant-wolf-hunt"};
-export interface PlayerState {id:string;name:string;x:number;z:number;heading:number}
+export interface PlayerState {id:string;name:string;x:number;z:number;heading:number;character?:CharacterIdentity}
 export interface WelcomeMessage {type:"welcome";protocol:9;id:string;token:string;player:PlayerState;character:CharacterIdentity}
 export interface CombatVital {health:number;stamina:number;maxHealth:number;maxStamina:number;alive:boolean}
 export interface CombatWolf {id:string;x:number;z:number;heading:number;health:number;maxHealth:number;phase:"idle"|"chase"|"windup"|"strike"|"dead";windupUntil:number}

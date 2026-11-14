@@ -12,9 +12,11 @@ import { CharacterPanel } from "./ui/character";
 import { ResourceGuide } from "./ui/resourceGuide";
 import { GameMenu } from "./ui/gameMenu";
 import { CharacterCreator } from "./ui/characterCreator";
+import {createRaceCharacter} from "./characters/raceModel";
+import {DEFAULT_APPEARANCE} from "../shared/src/characterCatalog";
 import { moveWithCollision } from "./world/collision";
 import { settlementsNear, discoverySettlements } from "./world/settlements";
-import { createAdventurer, createWolf } from "./characters/rig";
+import { createWolf } from "./characters/rig";
 import { mountAnimatedAsset, type AnimatedAsset, type AnimationState } from "./characters/animatedAsset";
 import { pointerSpacing, zoomFromPinch } from "./input/touchCamera";
 import { PLAYER_MAX_STAMINA, WOLF_MAX_HEALTH, ATTACK_STAMINA, DODGE_STAMINA, regenerateStamina, useStamina, withinAttackRange } from "./gameplay/combat";
@@ -75,7 +77,7 @@ house(7, -9);
 house(-7, 7);
 populateFrontierProps(scene);
 
-const adventurer = createAdventurer();
+let adventurer = createRaceCharacter({race:"sunborne",characterClass:"vanguard",appearance:DEFAULT_APPEARANCE});
 const avatar = new THREE.Group();
 avatar.add(adventurer.root);
 scene.add(avatar);
@@ -86,8 +88,7 @@ wolf.position.set(5, 0, 5);
 scene.add(wolf);
 let playerAsset: AnimatedAsset | null = null;
 let wolfAsset: AnimatedAsset | null = null;
-mountAnimatedAsset(avatar, adventurer.root, "/assets/adventurer.glb", ["idle","walk","attack","dodge"])
-  .then(asset => { playerAsset = asset; status.textContent = asset.loaded ? "Adventurer GLB loaded" : "Adventurer fallback active"; });
+// Procedural race avatars remain visible; the generic GLB would hide the selected race.
 mountAnimatedAsset(wolf, fallbackWolf, "/assets/wolf.glb", ["idle","walk","attack","death"])
   .then(asset => { wolfAsset = asset; if(!asset.loaded) console.warn("Wolf GLB unavailable"); });
 let wolfAttackAnimationUntil = 0;
@@ -171,7 +172,11 @@ const multiplayer = new MultiplayerClient(scene, avatar,
   state=>{const newLevel=characterPanel.update(state);if(newLevel!==null)status.textContent="Level up! You reached level "+newLevel;},
   result=>{if(result.action==="gather"&&result.nodeId&&result.retryAfterMs)resourceGuide.markCooldown(result.nodeId,result.retryAfterMs);},
   ()=>creator.show(),
-  identity=>{creator.hide();characterPanel.setIdentity(identity);}
+  identity=>{
+    creator.hide();characterPanel.setIdentity(identity);
+    avatar.remove(adventurer.root);adventurer.dispose();
+    adventurer=createRaceCharacter(identity);avatar.add(adventurer.root);
+  }
 );
 const multiplayerPanel=document.createElement("div");
 multiplayerPanel.id="multiplayer-panel";

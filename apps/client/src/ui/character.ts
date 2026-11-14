@@ -24,7 +24,7 @@ export class CharacterPanel {
     this.panel=document.createElement("section");
     this.panel.id="character-panel";this.panel.hidden=true;
     this.panel.setAttribute("aria-label","Character progression");
-    this.panel.innerHTML='<div class="character-heading"><strong>ADVENTURER</strong><button type="button" id="character-close">✕</button></div><p id="character-lineage"></p><p id="character-level">Connect to view your character.</p><progress id="character-xp" max="100" value="0"></progress><div id="character-stats"></div><p class="character-note">XP and levels are saved on the Bun server. Attributes are visible now; combat scaling and equipment arrive later.</p>';
+    this.panel.innerHTML='<div class="character-heading"><strong>ADVENTURER</strong><button type="button" id="character-close">✕</button></div><p id="character-lineage"></p><p id="character-level">Connect to view your character.</p><progress id="character-xp" max="100" value="0"></progress><div id="character-stats"></div><p class="character-note">XP, level and equipment are saved on Bun. Character appearance and class identity are fixed at creation.</p>';
     host.appendChild(this.panel);
     this.info=this.panel.querySelector<HTMLElement>("#character-level")!;
     this.lineage=this.panel.querySelector<HTMLElement>("#character-lineage")!;
