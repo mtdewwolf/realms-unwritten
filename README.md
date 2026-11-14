@@ -216,7 +216,7 @@ Server entry point: `apps/server/src/index.ts`. Core movement: `simulation.ts`. 
 - `GET /ws` with WebSocket upgrade: multiplayer connection.
 - Default port: **3001**; configurable via `PORT`.
 - Bind address: `0.0.0.0` by default; override via `HOST`.
-- Protocol version: **10** (client/server must use matching builds).
+- Protocol version: **11** (client/server must use matching builds).
 - Clients send `hello` with an optional existing guest token and optional sanitized display name; server sends `welcome` with player ID, token, initial position.
 - Clients send numbered movement vectors, not positions; server clamps speed and world bounds.
 - Server returns `snapshot` containing own authoritative position, acknowledgment sequence and nearby players.
@@ -294,6 +294,12 @@ New online guests now enter a character creator before the Bun server admits the
 Each original race has a distinct procedural Three.js body silhouette with class gear (Vanguard shield and sword, Spellweaver staff, Shadeblade blades). Character creation includes a draggable live 3D preview and five validated choices: build, skin tone, hairstyle, hair color and markings. The selection is persisted with the immutable character identity in SQLite and restored on reconnect; existing identity records are migrated to default appearance. Nearby players show the appropriate race/class silhouette using server-sent identity snapshots.
 
 Three class-specific starter abilities are now server authoritative: **Vanguard Bulwark** halves wolf bite damage for four seconds (14s cooldown); **Spellweaver Arc Bolt** deals 28 damage at up to nine meters (9s cooldown); **Shadeblade Quickstrike** deals 34 melee damage (7s cooldown). Each costs stamina, validates class/range, and appears on the Android HUD with cooldown feedback. This is an initial class identity milestone, not the complete vanilla-style spellbook, talent or resource system. Protocol **v10**. See [Race Models and Class Abilities](docs/RACE_MODELS_AND_CLASSES.md).
+
+### Visual rebuild and account-first Android launch
+
+**The APK now opens to an original fantasy title screen rather than entering the world immediately.** A realm URL is required for online accounts. Register or sign in with a username and password (Argon2id hashed server-side), then create your race/class/appearance if the account has no character; returning accounts load their saved hero. Offline demo and legacy guest are deliberate separate choices. Account sessions persist for 30 days and character ownership is stored in SQLite. These are prototype accounts, not yet production-ready security: use WSS in deployment, implement server-side global rate limiting, recovery and account management before public release. Protocol **v11**.
+
+The starter graphical rebuild replaces cube houses with original layered-roof, timber-framed fantasy cottages, painted-style procedural slate/wood/stone/plaster textures, richer tree canopies, warmer lighting and distinct 3D race-creator stages. This is **visual rebuild pass 1**, not a complete WoW-quality asset set or a Warcraft asset port. See [Visual Rebuild & Entry Flow](docs/VISUAL_REBUILD_V1.md) for exactly what has and has not been built.
 
 ### Guest persistence
 
@@ -541,7 +547,7 @@ Run this in addition to `bun test`; it is not a normal `test/*.test.ts` unit tes
    curl -fsS http://127.0.0.1:3001/health
    ```
 
-3. Verify response has `"ok":true`, protocol version `10`, and the online player count.
+3. Verify response has `"ok":true`, protocol version `11`, and the online player count.
 4. Open the client and connect to `ws://127.0.0.1:3001/ws` (when client and server are on the same machine).
 5. Confirm the connection-status message switches to online. Disconnect and verify offline exploration continues.
 6. In the terminal, check for runtime exceptions and ensure the server remains running.
