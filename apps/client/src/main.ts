@@ -4,6 +4,7 @@ import { populateFrontierProps } from "./world/frontierProps";
 import {createFantasyCottage,decorateVillage} from "./world/fantasyArchitecture";
 import {decorateFactionOutposts} from "./world/factionOutposts";
 import {WorldAtmosphere} from "./world/worldAtmosphere";
+import {CombatVisuals} from "./world/combatVisuals";
 import { ChunkedWorld, WORLD_HALF_SIZE, chunkCoordinate, groundHeightAt } from "./world/chunkedWorld";
 import { biomeAt } from "./world/terrain";
 import { landmarksNear, discoverableLandmarks } from "./world/landmarks";
@@ -53,6 +54,7 @@ const sunlight = new THREE.DirectionalLight(0xffd69a, 2.1);
 sunlight.position.set(-8, 16, 11);
 scene.add(sunlight);
 const atmosphere=new WorldAtmosphere(scene,sunlight);
+const combatVisuals=new CombatVisuals(scene);
 
 const world = new ChunkedWorld(scene);
 world.update(0,0);
@@ -145,8 +147,14 @@ const multiplayer = new MultiplayerClient(scene, avatar,
     if(!result.ok)battleInfo.textContent=result.reason||"Action rejected by server";
     else if(result.action==="attack")battleInfo.textContent="Wolf hit · shared HP "+result.wolfHealth;
     else battleInfo.textContent="Dodge active";
-    if(result.ok&&result.action==="attack")attackingUntil=performance.now()/1000+.27;
-    if(result.ok&&result.action==="dodge")dodgeUntil=performance.now()/1000+.6;
+    if(result.ok&&result.action==="attack"){
+      attackingUntil=performance.now()/1000+.27;
+      combatVisuals.emit("slash",avatar.position,wolf.position);
+    }
+    if(result.ok&&result.action==="dodge"){
+      dodgeUntil=performance.now()/1000+.6;
+      combatVisuals.emit("dodge",avatar.position);
+    }
   },
   ()=>{
     onlineWolf=null;lastServerStrikePhase="";
@@ -184,6 +192,8 @@ const multiplayer = new MultiplayerClient(scene, avatar,
   result=>{
     if(result.ok){
       abilityCooldownAt=performance.now()+result.cooldownSeconds*1000;
+      combatVisuals.emit(result.ability==="arc-bolt"?"arc-bolt":
+        result.ability==="quickstrike"?"quickstrike":"bulwark",avatar.position,wolf.position);
       battleInfo.textContent=result.ability==="bulwark"?"Bulwark active · reduced incoming damage":
         result.ability==="arc-bolt"?"Arc Bolt hit · wolf HP "+result.wolfHealth:
         "Quickstrike hit · wolf HP "+result.wolfHealth;
@@ -316,6 +326,7 @@ function attack() {
   if(next===null){battleInfo.textContent="Not enough stamina";return;}
   playerStamina=next;lastAttackTime=now;
   attackingUntil=now+0.27;
+  combatVisuals.emit("slash",avatar.position,wolf.position);
   if(withinAttackRange(avatar.position.x,avatar.position.z,wolf.position.x,wolf.position.z)) {
     wolfHealth=Math.max(0,wolfHealth-20);
     battleInfo.textContent=wolfHealth>0?"Sword hit · 20 damage":"Wolf defeated!";
@@ -334,6 +345,7 @@ function dodge() {
   if(next===null) {battleInfo.textContent="Not enough stamina";return;}
   playerStamina=next;
   dodgeUntil=now+0.6;
+  combatVisuals.emit("dodge",avatar.position);
   const direction=new THREE.Vector3(Math.sin(avatar.rotation.y),0,Math.cos(avatar.rotation.y));
   const landing=moveWithCollision(avatar.position.x,avatar.position.z,direction.x*2.25,direction.z*2.25);
   avatar.position.x=landing.x;avatar.position.z=landing.z;
@@ -504,6 +516,7 @@ function frame(now: number) {
   camera.position.copy(avatar.position).add(offset);
   camera.lookAt(avatar.position.x, 1, avatar.position.z);
   atmosphere.update(camera,avatar.position,elapsed);
+  combatVisuals.update(dt);
   const width = window.innerWidth, height = window.innerHeight;
   if (canvas.width !== Math.round(width * renderer.getPixelRatio()) ||
       canvas.height !== Math.round(height * renderer.getPixelRatio())) {
