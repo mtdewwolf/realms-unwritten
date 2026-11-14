@@ -13,7 +13,7 @@ import { ResourceGuide } from "./ui/resourceGuide";
 import { GameMenu } from "./ui/gameMenu";
 import { CharacterCreator } from "./ui/characterCreator";
 import {createRaceCharacter} from "./characters/raceModel";
-import {DEFAULT_APPEARANCE} from "../shared/src/characterCatalog";
+import {DEFAULT_APPEARANCE,type ClassId} from "../shared/src/characterCatalog";
 import { moveWithCollision } from "./world/collision";
 import { settlementsNear, discoverySettlements } from "./world/settlements";
 import { createWolf } from "./characters/rig";
@@ -133,6 +133,10 @@ const creator=new CharacterCreator(app,choice=>multiplayer.createCharacter(choic
 inventoryPanel.button.addEventListener("click",()=>multiplayer.requestInventory());
 let onlineWolf:ServerWolf|null=null;
 let lastServerStrikePhase="";
+let activeClass:ClassId="vanguard";
+let abilityCooldownAt=0;
+const abilityLabels:Record<ClassId,string>={vanguard:"BULWARK",spellweaver:"ARC BOLT",shadeblade:"QUICKSTRIKE"};
+const abilityNames:Record<ClassId,"bulwark"|"arc-bolt"|"quickstrike">={vanguard:"bulwark",spellweaver:"arc-bolt",shadeblade:"quickstrike"};
 const multiplayer = new MultiplayerClient(scene, avatar,
   text=>{status.textContent=text;},
   (vitals:ServerVitals,wolfState:ServerWolf|null)=>{
@@ -176,6 +180,19 @@ const multiplayer = new MultiplayerClient(scene, avatar,
     creator.hide();characterPanel.setIdentity(identity);
     avatar.remove(adventurer.root);adventurer.dispose();
     adventurer=createRaceCharacter(identity);avatar.add(adventurer.root);
+    activeClass=identity.characterClass;
+    abilityCooldownAt=0;
+    const control=document.querySelector<HTMLButtonElement>("#class-ability");
+    if(control)control.querySelector("span")!.textContent=abilityLabels[activeClass];
+  },
+  result=>{
+    if(result.ok){
+      abilityCooldownAt=performance.now()+result.cooldownSeconds*1000;
+      battleInfo.textContent=result.ability==="bulwark"?"Bulwark active · reduced incoming damage":
+        result.ability==="arc-bolt"?"Arc Bolt hit · wolf HP "+result.wolfHealth:
+        "Quickstrike hit · wolf HP "+result.wolfHealth;
+      if(result.ability!=="bulwark")attackingUntil=performance.now()/1000+.35;
+    }else battleInfo.textContent=result.reason??"Class ability rejected";
   }
 );
 const multiplayerPanel=document.createElement("div");
@@ -334,6 +351,15 @@ dodgeButton.id="dodge";
 dodgeButton.innerHTML='↝<span>DODGE</span>';
 document.querySelector("#actions")!.prepend(dodgeButton);
 dodgeButton.addEventListener("click",dodge);
+const abilityButton=document.createElement("button");
+abilityButton.id="class-ability";abilityButton.type="button";
+abilityButton.innerHTML='✦<span>BULWARK</span>';
+document.querySelector("#actions")!.appendChild(abilityButton);
+abilityButton.addEventListener("click",()=>{
+  if(!multiplayer.connected){battleInfo.textContent="Class abilities require the Bun server";return;}
+  if(performance.now()<abilityCooldownAt){battleInfo.textContent="Ability is cooling down";return;}
+  multiplayer.sendClassAbility(abilityNames[activeClass]);
+});
 let previous = performance.now();
 let elapsed = 0;
 function frame(now: number) {
@@ -342,6 +368,10 @@ function frame(now: number) {
   elapsed += dt;
   if(!multiplayer.connected)playerStamina = regenerateStamina(playerStamina,dt);
   staminaDisplay.value=playerStamina;
+  const remaining=Math.ceil((abilityCooldownAt-now)/1000);
+  const label=abilityButton.querySelector("span")!;
+  label.textContent=remaining>0?abilityLabels[activeClass]+" "+remaining+"s":abilityLabels[activeClass];
+  abilityButton.disabled=remaining>0;
   const x = axisX + Number(keys.has("d")) - Number(keys.has("a"));
   const z = axisZ + Number(keys.has("s")) - Number(keys.has("w"));
   const length = Math.hypot(x, z);

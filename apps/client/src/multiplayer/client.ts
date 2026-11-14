@@ -6,7 +6,7 @@ import type {InventoryState,RewardEvent} from "../ui/inventory";
 import type {QuestState,QuestResult} from "../ui/quests";
 import type {ProgressionState} from "../ui/character";
 import {HELLO_TIMEOUT_MS,MAX_RECONNECT_ATTEMPTS,reconnectDelay,shouldReconnect} from "./reconnectPolicy";
-import {CLASSES,type ClassId,type CharacterCreation,type CharacterIdentity} from "../../../shared/src/characterCatalog";
+import {type CharacterCreation,type CharacterIdentity} from "../../../shared/src/characterCatalog";
 
 interface PlayerState{id:string;name:string;x:number;z:number;heading:number;character?:CharacterIdentity}
 export interface ServerWolf{id:string;x:number;z:number;heading:number;health:number;maxHealth:number;phase:"idle"|"chase"|"windup"|"strike"|"dead";windupUntil:number}
@@ -32,7 +32,7 @@ export class MultiplayerClient {
   private retries=0;
   private retryTimer:ReturnType<typeof setTimeout>|null=null;
   private helloTimer:ReturnType<typeof setTimeout>|null=null;
-  constructor(private readonly scene:THREE.Scene,private readonly avatar:THREE.Group,private readonly status:(s:string)=>void,private readonly onCombat:(vitals:ServerVitals,wolf:ServerWolf|null)=>void,private readonly onActionResult:(result:CombatActionResult)=>void,private readonly onOffline:()=>void,private readonly onInventory:(state:InventoryState)=>void,private readonly onReward:(event:RewardEvent)=>void,private readonly onQuest:(quest:QuestState)=>void,private readonly onQuestResult:(result:QuestResult)=>void,private readonly onProgression:(state:ProgressionState)=>void,private readonly onResource:(result:{type:"resource_result";action:"gather"|"craft";ok:boolean;nodeId?:string;retryAfterMs?:number})=>void,private readonly onCreationRequired:()=>void,private readonly onIdentity:(identity:CharacterIdentity)=>void){}
+  constructor(private readonly scene:THREE.Scene,private readonly avatar:THREE.Group,private readonly status:(s:string)=>void,private readonly onCombat:(vitals:ServerVitals,wolf:ServerWolf|null)=>void,private readonly onActionResult:(result:CombatActionResult)=>void,private readonly onOffline:()=>void,private readonly onInventory:(state:InventoryState)=>void,private readonly onReward:(event:RewardEvent)=>void,private readonly onQuest:(quest:QuestState)=>void,private readonly onQuestResult:(result:QuestResult)=>void,private readonly onProgression:(state:ProgressionState)=>void,private readonly onResource:(result:{type:"resource_result";action:"gather"|"craft";ok:boolean;nodeId?:string;retryAfterMs?:number})=>void,private readonly onCreationRequired:()=>void,private readonly onIdentity:(identity:CharacterIdentity)=>void,private readonly onAbility:(result:ClassAbilityResult)=>void){}
   get connected():boolean{return this.online&&this.socket?.readyState===WebSocket.OPEN;}
   connect(url:string):void{
     this.disconnect();
@@ -91,7 +91,7 @@ export class MultiplayerClient {
         this.avatar.position.x=message.player.x;this.avatar.position.z=message.player.z;
         this.status("Online · authoritative movement connected");return;
       }
-      if(message.type==="ability_result"){this.status(message.ok?"Ability activated · "+message.ability:message.reason??"Ability rejected");return;}
+      if(message.type==="ability_result"){this.onAbility(message);this.status(message.ok?"Ability activated · "+message.ability:message.reason??"Ability rejected");return;}
       if(message.type==="use_result"){this.status(message.ok?"Healing Tonic used · health "+message.health:"Cannot use tonic: "+(message.reason??"Unavailable"));return;}
       if(message.type==="progression"){this.onProgression(message);return;}
       if(message.type==="quest_status"){this.onQuest(message);return;}

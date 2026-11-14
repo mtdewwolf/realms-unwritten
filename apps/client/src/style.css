@@ -169,3 +169,7 @@
 #character-creator #creator-appearance{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:9px;max-width:760px}
 #character-creator #creator-appearance label{display:flex;flex-direction:column;gap:5px;margin:0}
 #character-creator #creator-appearance select{width:100%;min-height:44px;padding:8px;background:#182e2b;color:white;border:1px solid #8fae9d;border-radius:9px}
+
+#class-ability{border:1px solid #e2c984;background:#614680e9;color:#f3e9ff;touch-action:manipulation}
+#class-ability:disabled{opacity:.6}
+@media(max-width:700px){#class-ability span{font-size:9px;letter-spacing:0}}
