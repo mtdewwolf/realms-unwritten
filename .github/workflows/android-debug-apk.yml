@@ -39,6 +39,7 @@ jobs:
       - name: Generate playable character assets
         run: |
           mkdir -p apps/client/public/assets
+          python3 -m py_compile tools/blender/generate_races.py tools/blender/render_lineup.py
           blender --background --factory-startup --python-exit-code 1 --python tools/blender/generate_characters.py -- --out apps/client/public/assets
           python3 tools/blender/validate_glb.py apps/client/public/assets
           blender --background --factory-startup --python-exit-code 1 --python tools/blender/generate_races.py -- --out apps/client/public/assets
