@@ -59,6 +59,7 @@ Status meanings: **Implemented** = present in source and exercised by automated 
 | NPC dialogue, quests, merchants | **Prototype** | Verdant Reach guard offers one persistent Wolf Hunt quest; no dialogue trees or merchants |
 | Chat, party, guilds, dungeons | **Planned** | No social or cooperative gameplay |
 | Production hosting and scale | **Prototype** | One Railway Bun service and a `/data` volume; no sharding, autoscaling, or load-test results |
+| Ideas board | **Implemented** | Private kanban service in `apps/kanban`, separate from the game server; SQLite on its own `/data` volume |
 
 **Last audited baseline:** branch `Master`, commit `0c24d4e` (November 2026). [Android / WebSocket smoke CI — passed](https://github.com/mtdewwolf/realms-unwritten/actions/runs/43148146024). This confirms a successful automated build and live two-client smoke test on a GitHub runner; **it is not evidence of real-device Android performance or production service reliability**.
 
@@ -360,11 +361,13 @@ Four original races per faction now produce 24 race/class GLBs with contrasting 
 │   │   │   ├── ui/worldMap.ts           # Atlas and fog-of-war
 │   │   │   └── multiplayer/client.ts    # WebSocket snapshots and remote avatars
 │   │   └── capacitor.config.ts
-│   └── server/
-│       └── src/
-│           ├── index.ts                # Bun HTTP/WebSocket + SQLite
-│           ├── protocol.ts             # Message schemas and validation
-│           └── simulation.ts           # Fixed-step movement + AOI snapshots
+│   ├── server/
+│   │   └── src/
+│   │       ├── index.ts                # Bun HTTP/WebSocket + SQLite
+│   │       ├── protocol.ts             # Message schemas and validation
+│   │       └── simulation.ts           # Fixed-step movement + AOI snapshots
+│   └── kanban/
+│       └── src/index.ts                # Private ideas board (separate Railway service)
 ├── tools/
 │   ├── blender/                          # GLB generator + validator
 │   └── smoke-server.ts                  # Live two-client WebSocket check
@@ -404,7 +407,7 @@ bun run dev:server
 bun run dev:client
 ```
 
-Or start both with `bun run dev`. Vite usually serves at `http://localhost:5173` unless that port is occupied. The Bun server is `http://localhost:3001` by default.
+Or start both with `bun run dev`. Vite usually serves at `http://localhost:5173` unless that port is occupied. The Bun server is `http://localhost:3001` by default. The private ideas board is separate: `bun run dev:kanban` serves it at `http://localhost:3002`. See [apps/kanban/README.md](apps/kanban/README.md).
 
 5. Open `http://localhost:5173`, explore offline or enter `ws://localhost:3001/ws` in the multiplayer URL field and tap **CONNECT**.
 
@@ -435,6 +438,10 @@ The process creates the parent directory of `WORLD_DB_PATH` when it is missing. 
 On the Android title screen, enter the realm URL `wss://<your-domain>/ws`. The current production realm is `wss://realmsserver-production.up.railway.app/ws`. Railway terminates TLS and forwards that WebSocket to the container.
 
 A redeploy sends SIGTERM. The server saves positions, checkpoints the SQLite WAL into the main database file, and closes it before exiting.
+
+### Ideas board
+
+`apps/kanban` (`@realms/kanban`) is a separate private kanban for game ideas. It does not share the world database or the game protocol. In the same Railway project, add another service from this repo with root directory `apps/kanban`. Railpack starts `bun src/index.ts`. Give it its own volume at `/data`, one replica, `KANBAN_DB_PATH=/data/kanban.sqlite`, and `KANBAN_PASSWORD`. Deploy steps are in [apps/kanban/README.md](apps/kanban/README.md).
 
 These accounts stay prototype-grade on the hosted server. Passwords are Argon2id hashes and sessions last 30 days, but there is no email recovery, global rate limiting, or account management. Use a unique password. This is not production-ready account security.
 
@@ -528,6 +535,7 @@ Existing Bun test files cover:
 | Test file | What it checks |
 | --- | --- |
 | `test/bootstrap.test.ts` | Project/bootstrap invariants |
+| `test/kanban.test.ts` | Ideas board auth, CRUD, move/reorder, and SIGTERM checkpoint |
 | `test/assets.test.ts` | Asset catalog/limits |
 | `test/glb-wiring.test.ts` | GLB URL wiring |
 | `test/touch-camera.test.ts` | Pinch and camera input math |

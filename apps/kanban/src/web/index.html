@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+    <meta name="theme-color" content="#14110e">
+    <title>Realms Unwritten — Ideas</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect fill='%2314110e' width='32' height='32'/%3E%3Cpath fill='%23e2b657' d='M6 8h20v3H6zm0 6h14v3H6zm0 6h17v3H6z'/%3E%3C/svg%3E">
+    <link rel="stylesheet" href="/assets/app.css?v=__ASSET_VERSION__">
+  </head>
+  <body>
+    <p id="boot">Opening the ideas board…</p>
+    <section id="login" hidden>
+      <form id="login-form">
+        <p class="eyebrow">Realms Unwritten</p>
+        <h1>Ideas</h1>
+        <p class="lede">A private board for combat, quests, crafting, and the rest of the world that is not in the game yet.</p>
+        <label for="password">Shared password</label>
+        <input id="password" name="password" type="password" autocomplete="current-password" enterkeyhint="go" required>
+        <p id="login-error" role="alert"></p>
+        <button type="submit">Enter</button>
+      </form>
+    </section>
+    <div id="app" hidden>
+      <header>
+        <div class="brand">
+          <p class="eyebrow">Realms Unwritten</p>
+          <h1>Ideas</h1>
+        </div>
+        <button id="logout" type="button">Log out</button>
+        <label class="search" for="search">Search</label>
+        <input id="search" type="search" enterkeyhint="search" placeholder="Search titles, notes, and tags" autocomplete="off">
+        <div id="tag-filters"></div>
+        <div class="header-actions">
+          <button id="new-idea" type="button">New idea</button>
+          <button id="add-column" type="button">Add column</button>
+        </div>
+      </header>
+      <p id="dev-banner" hidden>Open local board. No password is set, so anyone who can reach this process can edit it.</p>
+      <p id="filter-note" hidden>Drag is off while a search or tag filter is active. Use Move on a card.</p>
+      <nav id="column-tabs" aria-label="Columns"></nav>
+      <main id="board"></main>
+    </div>
+    <dialog id="idea-dialog">
+      <form id="idea-form">
+        <h2 id="idea-heading">New idea</h2>
+        <label for="idea-title">Title</label>
+        <input id="idea-title" name="title" maxlength="160" required autocomplete="off">
+        <label for="idea-description">Notes</label>
+        <textarea id="idea-description" name="description" maxlength="20000" rows="8" placeholder="Markdown works: **bold**, lists, and links."></textarea>
+        <label for="idea-priority">Priority</label>
+        <select id="idea-priority" name="priority">
+          <option value="low">Low</option>
+          <option value="medium" selected>Medium</option>
+          <option value="high">High</option>
+        </select>
+        <div id="column-field">
+          <label for="idea-column">Column</label>
+          <select id="idea-column" name="columnId"></select>
+        </div>
+        <p class="field-label">Tags</p>
+        <div id="idea-tags"></div>
+        <div class="tag-add">
+          <label for="tag-input">Add a tag</label>
+          <input id="tag-input" maxlength="24" autocomplete="off" placeholder="crafting">
+          <button id="tag-add" type="button">Add</button>
+        </div>
+        <p id="idea-error" role="alert"></p>
+        <p id="idea-times"></p>
+        <div class="dialog-actions">
+          <button id="idea-delete" type="button" hidden>Delete</button>
+          <button id="idea-cancel" type="button">Cancel</button>
+          <button id="idea-save" type="submit">Save</button>
+        </div>
+      </form>
+    </dialog>
+    <dialog id="move-dialog">
+      <h2 id="move-heading">Move idea</h2>
+      <div id="move-actions"></div>
+      <button id="move-cancel" type="button">Close</button>
+    </dialog>
+    <dialog id="column-dialog">
+      <form id="column-form">
+        <h2 id="column-heading">New column</h2>
+        <label for="column-name">Name</label>
+        <input id="column-name" name="name" maxlength="48" required autocomplete="off">
+        <p id="column-error" role="alert"></p>
+        <div class="dialog-actions">
+          <button id="column-cancel" type="button">Cancel</button>
+          <button type="submit">Save</button>
+        </div>
+      </form>
+    </dialog>
+    <div id="toast" role="status"></div>
+    <script type="module" src="/assets/app.js?v=__ASSET_VERSION__"></script>
+  </body>
+</html>
