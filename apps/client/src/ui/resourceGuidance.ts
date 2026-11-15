@@ -33,6 +33,19 @@ export function closestResource(x:number,z:number,radius=ORE_TRACK_RADIUS):Resou
   candidates.sort((a,b)=>a.distance-b.distance||a.id.localeCompare(b.id));
   return candidates[0]??null;
 }
+export interface GatherDecision{send:boolean;message:string|null;target:ResourceTarget|null}
+/**
+ * Decide a gather from the live position. The HUD target is refreshed on a
+ * timer, so a tap must not trust that cached sample: the player can already
+ * be standing on the node.
+ */
+export function gatherRequest(position:{x:number;z:number},connected:boolean):GatherDecision{
+  if(!connected)return {send:false,message:"Connect to the Bun server to mine Ironstone Outcrops.",target:null};
+  if(!Number.isFinite(position.x)||!Number.isFinite(position.z))return {send:false,message:"Move closer to ore or Moonleaf.",target:null};
+  const target=closestResource(position.x,position.z);
+  if(target&&!target.inRange)return {send:false,message:"Move "+Math.round(target.distance)+"m toward ore or tap TRACK ORE",target};
+  return {send:true,message:null,target};
+}
 export function workshopDistance(x:number,z:number):number{
   return Math.hypot(x-WORKSHOP.x,z-WORKSHOP.z);
 }
