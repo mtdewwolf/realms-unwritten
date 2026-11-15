@@ -9,6 +9,9 @@ import os
 import sys
 import bpy
 
+sys.path.insert(0, os.path.dirname(__file__))
+from female_mesh import make_female, merge_draws
+
 RACES={
  "sunborne":{"skin":(.78,.55,.36),"armor":(.26,.43,.57),"hair":(.33,.24,.18)},
  "thornkin":{"skin":(.48,.69,.45),"armor":(.30,.48,.34),"hair":(.28,.39,.19)},
@@ -215,7 +218,7 @@ def heroic_detail(rig,race,profession,palette,skin,hair,armor,leather,metal,glow
    piece(rig,"Assassin belt vial %s"%s,"hips",(s*.42,-.21,.85),(.16,.13,.29),glow,"cylinder")
  return
 
-def hero(out,race,profession):
+def hero(out,race,profession,body_type):
  reset();rig=skeleton();palette=RACES[race]
  skin=mat("RU_SKIN",palette["skin"])
  hair=mat("RU_HAIR",palette["hair"])
@@ -224,58 +227,67 @@ def hero(out,race,profession):
  metal=mat("RU_METAL",(.63,.66,.67))
  glow=mat("RU_GLOW",(.95,.73,.37) if race in ("sunborne","thornkin") else (.66,.40,.79))
  dark=mat("RU_DARK",(.12,.14,.17))
- width=PROPORTIONS[race][1]
- piece(rig,"Coat","spine",(0,0,1.37),(.72*width,.50,.82),armor)
- piece(rig,"Belt","hips",(0,0,.95),(.78*width,.52,.14),leather)
- piece(rig,"Face","head",(0,0,2.02),(.41,.34,.46),skin,"sphere")
- piece(rig,"Neck guard","spine",(0,0,1.79),(.56,.45,.15),metal)
- for side,s in (("L",-1),("R",1)):
-  piece(rig,"Pauldron_"+side,"spine",(s*.51*width,0,1.65),(.31,.39,.22),metal)
-  piece(rig,"Arm_"+side,"arm_"+side,(s*.53*width,0,1.31),(.25,.30,.65),armor)
-  piece(rig,"Hand_"+side,"arm_"+side,(s*.55*width,.0,1.06),(.25,.28,.21),skin)
-  piece(rig,"Leg_"+side,"leg_"+side,(s*.22,0,.49),(.29,.37,.76),leather)
-  piece(rig,"Boot_"+side,"leg_"+side,(s*.22,.06,.16),(.35,.46,.33),dark)
-  if race=="thornkin":
-   piece(rig,"Woodland ear "+side,"head",(s*.33,0,2.14),(.29,.25,.36),skin,"cone")
-   piece(rig,"Antler "+side,"head",(s*.22,-.08,2.54),(.18,.16,.60),leather,"cone")
-  elif race=="ashforged":
-   piece(rig,"Obsidian horn "+side,"head",(s*.21,-.07,2.48),(.24,.22,.52),dark,"cone")
-   piece(rig,"Forge emblem "+side,"spine",(s*.37,-.28,1.48),(.18,.07,.32),glow)
-  elif race=="veilkin":
-   piece(rig,"Veil ear "+side,"head",(s*.34,0,2.09),(.27,.17,.48),skin,"cone")
-   piece(rig,"Luminous rune "+side,"head",(s*.15,-.24,2.01),(.065,.03,.09),glow)
-  else:
-   piece(rig,"Sun crest "+side,"head",(s*.16,0,2.43),(.15,.13,.28),glow,"cone")
- # Rig all four hairstyles but allow the client to select by object visibility.
- for style in range(4):
-  name="RU_HAIR_STYLE_%s"%style
-  if style==0:piece(rig,name,"head",(0,.035,2.34),(.55,.45,.15),hair)
-  elif style==1:piece(rig,name,"head",(0,.16,2.24),(.61,.39,.50),hair)
-  elif style==2:
-   for i in range(3):piece(rig,name+"_%d"%i,"head",((i-1)*.17,0,2.49),(.24,.22,.35),hair,"cone")
-  else:
-   for i in range(2):piece(rig,name+"_%d"%i,"head",((i*2-1)*.20,.16,2.16),(.18,.18,.56),hair)
- # The facial-marking mesh can be recolored or hidden by the runtime.
- for side,s in (("L",-1),("R",1)):
-  piece(rig,"RU_MARKING_"+side,"head",(s*.14,-.23,2.03),(.13,.03,.06),glow)
- if profession=="vanguard":
-  piece(rig,"Runeblade","arm_R",(.66,-.05,.64),(.13,.17,1.15),metal)
-  piece(rig,"Blade hilt","arm_R",(.66,-.05,1.15),(.36,.18,.10),leather)
-  piece(rig,"Citadel shield","arm_L",(-.67,-.25,1.24),(.62,.16,.83),metal)
- elif profession=="spellweaver":
-  piece(rig,"Arcane staff","arm_R",(.63,-.12,.66),(.15,.16,1.9),leather)
-  piece(rig,"Staff focus","arm_R",(.63,-.12,1.66),(.35,.36,.36),glow,"sphere")
-  piece(rig,"Mantle","spine",(0,.22,1.31),(.81,.14,.82),armor)
+ if body_type=="female":
+  gold=mat("RU_FITTING",(.77,.57,.28))
+  ivory=mat("RU_IVORY",(.79,.72,.54))
+  make_female(rig,race,profession,skin,hair,armor,leather,metal,glow,dark,gold,ivory,piece)
+  merge_draws(rig)
  else:
+  width=PROPORTIONS[race][1]
+  piece(rig,"Coat","spine",(0,0,1.37),(.72*width,.50,.82),armor)
+  piece(rig,"Belt","hips",(0,0,.95),(.78*width,.52,.14),leather)
+  piece(rig,"Face","head",(0,0,2.02),(.41,.34,.46),skin,"sphere")
+  piece(rig,"Neck guard","spine",(0,0,1.79),(.56,.45,.15),metal)
   for side,s in (("L",-1),("R",1)):
-   piece(rig,"Moonsteel dagger "+side,"arm_"+side,(s*.59,-.13,.85),(.12,.14,.8),metal)
-   piece(rig,"Dagger guard "+side,"arm_"+side,(s*.59,-.13,1.01),(.24,.17,.11),leather)
- heroic_detail(rig,race,profession,palette,skin,hair,armor,leather,metal,glow,dark)
+   piece(rig,"Pauldron_"+side,"spine",(s*.51*width,0,1.65),(.31,.39,.22),metal)
+   piece(rig,"Arm_"+side,"arm_"+side,(s*.53*width,0,1.31),(.25,.30,.65),armor)
+   piece(rig,"Hand_"+side,"arm_"+side,(s*.55*width,.0,1.06),(.25,.28,.21),skin)
+   piece(rig,"Leg_"+side,"leg_"+side,(s*.22,0,.49),(.29,.37,.76),leather)
+   piece(rig,"Boot_"+side,"leg_"+side,(s*.22,.06,.16),(.35,.46,.33),dark)
+   if race=="thornkin":
+    piece(rig,"Woodland ear "+side,"head",(s*.33,0,2.14),(.29,.25,.36),skin,"cone")
+    piece(rig,"Antler "+side,"head",(s*.22,-.08,2.54),(.18,.16,.60),leather,"cone")
+   elif race=="ashforged":
+    piece(rig,"Obsidian horn "+side,"head",(s*.21,-.07,2.48),(.24,.22,.52),dark,"cone")
+    piece(rig,"Forge emblem "+side,"spine",(s*.37,-.28,1.48),(.18,.07,.32),glow)
+   elif race=="veilkin":
+    piece(rig,"Veil ear "+side,"head",(s*.34,0,2.09),(.27,.17,.48),skin,"cone")
+    piece(rig,"Luminous rune "+side,"head",(s*.15,-.24,2.01),(.065,.03,.09),glow)
+   else:
+    piece(rig,"Sun crest "+side,"head",(s*.16,0,2.43),(.15,.13,.28),glow,"cone")
+  # Rig all four hairstyles but allow the client to select by object visibility.
+  for style in range(4):
+   name="RU_HAIR_STYLE_%s"%style
+   if style==0:piece(rig,name,"head",(0,.035,2.34),(.55,.45,.15),hair)
+   elif style==1:piece(rig,name,"head",(0,.16,2.24),(.61,.39,.50),hair)
+   elif style==2:
+    for i in range(3):piece(rig,name+"_%d"%i,"head",((i-1)*.17,0,2.49),(.24,.22,.35),hair,"cone")
+   else:
+    for i in range(2):piece(rig,name+"_%d"%i,"head",((i*2-1)*.20,.16,2.16),(.18,.18,.56),hair)
+  # The facial-marking mesh can be recolored or hidden by the runtime.
+  for side,s in (("L",-1),("R",1)):
+   piece(rig,"RU_MARKING_"+side,"head",(s*.14,-.23,2.03),(.13,.03,.06),glow)
+  if profession=="vanguard":
+   piece(rig,"Runeblade","arm_R",(.66,-.05,.64),(.13,.17,1.15),metal)
+   piece(rig,"Blade hilt","arm_R",(.66,-.05,1.15),(.36,.18,.10),leather)
+   piece(rig,"Citadel shield","arm_L",(-.67,-.25,1.24),(.62,.16,.83),metal)
+  elif profession=="spellweaver":
+   piece(rig,"Arcane staff","arm_R",(.63,-.12,.66),(.15,.16,1.9),leather)
+   piece(rig,"Staff focus","arm_R",(.63,-.12,1.66),(.35,.36,.36),glow,"sphere")
+   piece(rig,"Mantle","spine",(0,.22,1.31),(.81,.14,.82),armor)
+  else:
+   for side,s in (("L",-1),("R",1)):
+    piece(rig,"Moonsteel dagger "+side,"arm_"+side,(s*.59,-.13,.85),(.12,.14,.8),metal)
+    piece(rig,"Dagger guard "+side,"arm_"+side,(s*.59,-.13,1.01),(.24,.17,.11),leather)
+  heroic_detail(rig,race,profession,palette,skin,hair,armor,leather,metal,glow,dark)
  animate(rig)
  height_scale,width_scale=PROPORTIONS[race]
+ if body_type=="female":
+  height_scale*=.94
  rig.scale=(width_scale,width_scale,height_scale)
  os.makedirs(out,exist_ok=True)
- path=os.path.join(out,"hero-%s-%s.glb"%(race,profession))
+ suffix="-female" if body_type=="female" else ""
+ path=os.path.join(out,f"hero-{race}-{profession}{suffix}.glb")
  bpy.ops.object.select_all(action="DESELECT");rig.select_set(True)
  for obj in bpy.data.objects:
   if obj.type=="MESH" and obj.parent==rig:obj.select_set(True)
@@ -288,5 +300,6 @@ if __name__=="__main__":
  parser=argparse.ArgumentParser();parser.add_argument("--out",default="apps/client/public/assets")
  config=parser.parse_args(argv)
  for race in RACES:
-  for profession in CLASSES:hero(config.out,race,profession)
- print("RACE ASSET PACK COMPLETE: 12 animated original GLBs",flush=True)
+  for profession in CLASSES:
+   for body_type in ("male","female"):hero(config.out,race,profession,body_type)
+ print("RACE ASSET PACK COMPLETE: 48 animated original GLBs",flush=True)

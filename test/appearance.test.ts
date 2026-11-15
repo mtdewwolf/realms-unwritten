@@ -4,9 +4,13 @@ import {DEFAULT_APPEARANCE,parseAppearance,parseCharacterCreation} from "../apps
 import {CharacterIdentityStore} from "../apps/server/src/characterIdentity";
 describe("appearance and character migration",()=>{
  test("reject invalid appearance indices and forged payloads",()=>{
-  for(const values of [{hairStyle:4},{skinTone:-1},{hairColor:99},{marking:1.3},{frame:"enormous"},{skinTone:"1"}])
+  for(const values of [{bodyType:"unknown"},{bodyType:null},{hairStyle:4},{skinTone:-1},{hairColor:99},{marking:1.3},{frame:"enormous"},{skinTone:"1"}])
    expect(parseAppearance({...DEFAULT_APPEARANCE,...values})).toBeNull();
   expect(parseCharacterCreation({type:"create_character",name:"Aria",faction:"radiant-accord",race:"sunborne",characterClass:"vanguard",appearance:{...DEFAULT_APPEARANCE,hairColor:7}})).toBeNull();
+ });
+ test("legacy appearance retains its saved customization",()=>{
+  expect(parseAppearance({frame:"sturdy",skinTone:2,hairStyle:1,hairColor:3,marking:2})).toEqual(
+    {bodyType:"male",frame:"sturdy",skinTone:2,hairStyle:1,hairColor:3,marking:2});
  });
  test("old identity schema upgrades in place",()=>{
   const db=new Database(":memory:");
@@ -24,7 +28,7 @@ describe("appearance and character migration",()=>{
   const db=new Database(":memory:");
   db.exec("PRAGMA foreign_keys=ON;CREATE TABLE characters(id TEXT PRIMARY KEY,name TEXT NOT NULL);INSERT INTO characters VALUES ('a','Nyx')");
   const store=new CharacterIdentityStore(db);
-  const choice=parseCharacterCreation({type:"create_character",name:"Nyx",faction:"umbral-dominion",race:"veilkin",characterClass:"shadeblade",appearance:{frame:"sturdy",skinTone:2,hairStyle:3,hairColor:4,marking:2}})!;
+  const choice=parseCharacterCreation({type:"create_character",name:"Nyx",faction:"umbral-dominion",race:"veilkin",characterClass:"shadeblade",appearance:{bodyType:"female",frame:"sturdy",skinTone:2,hairStyle:3,hairColor:4,marking:2}})!;
   store.assign("a",choice);
   expect(new CharacterIdentityStore(db).read("a")).toEqual(choice);
   db.close();

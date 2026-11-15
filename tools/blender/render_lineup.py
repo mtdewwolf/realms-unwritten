@@ -28,7 +28,7 @@ def light(name,loc,energy,color,size):
  data=bpy.data.lights.new(name,"AREA");data.energy=energy;data.color=color;data.shape="DISK";data.size=size
  obj=bpy.data.objects.new(name,data);bpy.context.collection.objects.link(obj);obj.location=loc
  rot=Vector((0,0,1.5))-obj.location;obj.rotation_euler=rot.to_track_quat("-Z","Y").to_euler()
-def render(faction,characters,assets,out):
+def render(faction,characters,assets,out,body_type):
  bpy.ops.object.select_all(action="SELECT");bpy.ops.object.delete(use_global=False)
  for item in list(bpy.data.materials):bpy.data.materials.remove(item)
  good=faction=="radiant-accord"
@@ -41,11 +41,20 @@ def render(faction,characters,assets,out):
   cube("Hall pillar",(x,2.75,2.6),(.48,.54,5.35),stone)
   cube("Crest trim",(x,2.4,5.0),(.70,.65,.27),gold)
  for i,(race,profession) in enumerate(characters):
-  asset=os.path.join(assets,"hero-%s-%s.glb"%(race,profession))
+  suffix="-female" if body_type=="female" else ""
+  asset=os.path.join(assets,f"hero-{race}-{profession}{suffix}.glb")
   assert os.path.isfile(asset),asset
   old=set(bpy.data.objects)
   bpy.ops.import_scene.gltf(filepath=asset)
   imported=set(bpy.data.objects)-old
+  for obj in imported:
+   if obj.name.startswith(("RU_HAIR_STYLE_1","RU_HAIR_STYLE_2","RU_HAIR_STYLE_3","RU_MARKING_")):
+    obj.hide_render=True
+   if obj.type=="ARMATURE" and obj.animation_data:
+    obj.animation_data.action=None
+    for track in obj.animation_data.nla_tracks:track.mute=True
+    for bone in obj.pose.bones:bone.matrix_basis.identity()
+  bpy.context.view_layer.update()
   roots=[o for o in imported if o.parent not in imported]
   group=bpy.data.objects.new("RU_LINEUP_"+race,None)
   bpy.context.collection.objects.link(group)
@@ -78,7 +87,8 @@ def render(faction,characters,assets,out):
  scene.render.film_transparent=False
  scene.world.color=(.10,.10,.10)
  scene.view_settings.view_transform="Standard"
- scene.render.filepath=os.path.join(out,"lineup-"+faction+".png")
+ prefix="lineup-female-" if body_type=="female" else "lineup-"
+ scene.render.filepath=os.path.join(out,prefix+faction+".png")
  bpy.ops.render.render(write_still=True)
  print("RENDERED_ACTUAL_GLB_LINEUP",scene.render.filepath,os.path.getsize(scene.render.filepath),flush=True)
 
@@ -86,7 +96,8 @@ if __name__=="__main__":
  args=sys.argv[sys.argv.index("--")+1:] if "--" in sys.argv else []
  p=argparse.ArgumentParser();p.add_argument("--assets",default="apps/client/public/assets")
  p.add_argument("--out",default="build/lineup-previews")
+ p.add_argument("--body-type",choices=("male","female"),default="male")
  a=p.parse_args(args)
  os.makedirs(a.out,exist_ok=True)
- for faction,characters in FACTIONS.items():render(faction,characters,a.assets,a.out)
+ for faction,characters in FACTIONS.items():render(faction,characters,a.assets,a.out,a.body_type)
  print("PASS ACTUAL GLB FACTION LINEUP RENDERS",flush=True)

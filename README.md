@@ -49,7 +49,7 @@ The title screen talks to `ws://` or `wss://` at the path `/ws`.
 
 ### Characters and races
 
-Creation sends `create_character` with a name, faction, race, and class. A name is 3–20 characters after trimming, starts with a letter or number, and may include letters, numbers, spaces, apostrophes, and hyphens. The race has to belong to the faction. Optional appearance is body frame (`lean` or `sturdy`), skin tone, hair style, hair color, and marking. Identity is stored in SQLite and comes back on `welcome`.
+Creation sends `create_character` with a name, faction, race, and class. A name is 3–20 characters after trimming, starts with a letter or number, and may include letters, numbers, spaces, apostrophes, and hyphens. The race has to belong to the faction. Optional appearance includes body type (`male` or `female`), build (`lean` or `sturdy`), skin tone, hairstyle, hair color, and marking. Existing appearance records without a body type keep their original male mesh. Identity is stored in SQLite and sent in `welcome` and nearby-player snapshots.
 
 | The Radiant Accord | The Umbral Dominion |
 | --- | --- |
@@ -313,10 +313,10 @@ Headless Blender Python under `tools/blender/` builds the rigged prototypes. Gen
 | Script | Output |
 | --- | --- |
 | `generate_characters.py` | `adventurer.glb` (`idle`, `walk`, `attack`, `dodge`) and `wolf.glb` (`idle`, `walk`, `attack`, `death`) |
-| `generate_races.py` | 24 files, `hero-<race>-<class>.glb`, each with `idle`, `walk`, `attack`, `dodge`, `cast`, `death` |
+| `generate_races.py` | 48 files, `hero-<race>-<class>.glb` and `hero-<race>-<class>-female.glb`, each with `idle`, `walk`, `attack`, `dodge`, `cast`, `death` |
 | `render_lineup.py` | `lineup-radiant-accord.png` and `lineup-umbral-dominion.png` from the exported race GLBs |
 | `validate_glb.py` | Checks `adventurer.glb` and `wolf.glb` for glTF 2, a skin, and those clips |
-| `validate_races.py` | Checks all 24 race GLBs and prints `PASS 24 race/class rigs and required clips` |
+| `validate_races.py` | Checks all 48 race GLBs, skeletons, clips, and female appearance regions |
 
 The client loads `/assets/wolf.glb` and `/assets/hero-<race>-<class>.glb`. The procedural mesh stays up until that load succeeds. `adventurer.glb` is still produced and validated; the player avatar does not mount it.
 
@@ -339,7 +339,7 @@ blender --background --factory-startup --python-exit-code 1 \
 
 Two workflows:
 
-- [Build Blender Character Assets](https://github.com/mtdewwolf/realms-unwritten/actions/workflows/blender-assets.yml) runs on `ubuntu-24.04` when `tools/blender/**` or that workflow file changes on `Master` or `main`, and from **Run workflow**. It builds and validates `adventurer.glb` and `wolf.glb`, writes `SHA256SUMS`, and uploads `realms-unwritten-character-glbs` (kept 30 days). It does not build the 24 race models.
+- [Build Blender Character Assets](https://github.com/mtdewwolf/realms-unwritten/actions/workflows/blender-assets.yml) runs on `ubuntu-24.04` when `tools/blender/**` or that workflow file changes on `Master` or `main`, and from **Run workflow**. It builds and validates `adventurer.glb`, `wolf.glb`, and all playable race models, renders the female faction lineups, and uploads the exports, previews, and `SHA256SUMS` (kept 30 days).
 - The Android workflow builds both generators, validates them, renders the two lineup PNGs, and bundles whatever landed in `apps/client/public/assets` into the web build and the APK.
 
 These meshes are generated blockouts: rigid skinning, no hand-painted production textures, and no device frame-time budget in CI. More detail is in [Blender pipeline](docs/assets/BLENDER_PIPELINE.md) and [eight-race lineup](docs/RACE_LINEUP_OVERHAUL.md).

@@ -9,7 +9,7 @@ The scripts that call `bpy` run inside Blender. `validate_glb.py` and `validate_
 | Script | Writes |
 | --- | --- |
 | `generate_characters.py` | `adventurer.glb` with clips `idle`, `walk`, `attack`, `dodge`, and `wolf.glb` with `idle`, `walk`, `attack`, `death`. `--out` defaults to `build/assets`. |
-| `generate_races.py` | One `hero-<race>-<class>.glb` for each of the eight races and three classes (24 files). Clips are `idle`, `walk`, `attack`, `dodge`, `cast`, and `death`. `--out` defaults to `apps/client/public/assets`. |
+| `generate_races.py` | An original `hero-<race>-<class>.glb` and a fitted `hero-<race>-<class>-female.glb` for each of the eight races and three classes (48 files). Clips are `idle`, `walk`, `attack`, `dodge`, `cast`, and `death`. `--out` defaults to `apps/client/public/assets`. |
 | `render_lineup.py` | `lineup-radiant-accord.png` and `lineup-umbral-dominion.png` from already exported race GLBs. `--assets` defaults to `apps/client/public/assets`. `--out` defaults to `build/lineup-previews`. |
 | `validate_glb.py <folder>` | Requires `adventurer.glb` and `wolf.glb` in that folder: glTF 2, at least one mesh, a skin, and the clips above. |
 | `validate_races.py <folder>` | Requires all 24 `hero-*.glb` files and the six race clips. Prints `PASS 24 race/class rigs and required clips`. |
@@ -45,7 +45,7 @@ blender --background --factory-startup --python-exit-code 1 \
 
 **Build Blender Character Assets** (`.github/workflows/blender-assets.yml`) runs on `ubuntu-24.04` when `tools/blender/**` or the workflow file changes on `Master` or `main`, and from **Run workflow**. It generates and validates `adventurer.glb` and `wolf.glb` under `build/assets`, writes `SHA256SUMS`, and uploads `realms-unwritten-character-glbs` for 30 days. It does not generate the race GLBs.
 
-**Android Debug APK** (`.github/workflows/android-debug-apk.yml`) compile-checks `generate_races.py` and `render_lineup.py`, runs both generators into `apps/client/public/assets`, validates them, renders the two lineup PNGs, and uploads those PNGs as `realms-unwritten-actual-race-lineups` (14 days) before the Vite build and the debug APK.
+**Android Debug APK** (`.github/workflows/android-debug-apk.yml`) compile-checks `generate_races.py` and `render_lineup.py`, runs both generators into `apps/client/public/assets`, validates them, renders the male and female faction lineup PNGs, and uploads those PNGs as `realms-unwritten-actual-race-lineups` (14 days) before the Vite build and the debug APK.
 
 ## Limits
 

@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import {RACES,type FactionId,type RaceId,type ClassId} from "../../../shared/src/characterCatalog";
+import {DEFAULT_APPEARANCE,RACES,type BodyType,type FactionId,type RaceId,type ClassId} from "../../../shared/src/characterCatalog";
 import {createRaceCharacter,type RaceCharacter} from "../characters/raceModel";
 import {createAnimatedRace,type AnimatedRace} from "../characters/raceAsset";
 
@@ -51,7 +51,7 @@ export class RaceLineup{
    };
    requestAnimationFrame(tick);
  }
- update(faction:FactionId,characterClass:ClassId,selected:RaceId):void{
+ update(faction:FactionId,characterClass:ClassId,selected:RaceId,bodyType:BodyType=DEFAULT_APPEARANCE.bodyType):void{
    this.selected=selected;
    const generation=++this.generation;
    for(const slot of this.slots){
@@ -59,17 +59,18 @@ export class RaceLineup{
    }
    this.slots.length=0;
    const races=(Object.keys(RACES) as RaceId[]).filter(r=>RACES[r].faction===faction);
+   const appearance={...DEFAULT_APPEARANCE,bodyType};
    for(let i=0;i<races.length;i++){
      const race=races[i];
      const group=new THREE.Group();group.position.set((i-1.5)*2.3,0,0);
-     const fallback=createRaceCharacter({race,characterClass});
+     const fallback=createRaceCharacter({race,characterClass,appearance});
      group.add(fallback.root);
      const ring=new THREE.Mesh(this.ringGeometry,this.ringMaterial);
      ring.rotation.x=-Math.PI/2;ring.position.y=.04;
      ring.visible=race===selected;group.add(ring);
      this.scene.add(group);
      const slot:Slot={race,group,fallback,ring};this.slots.push(slot);
-     void createAnimatedRace({race,characterClass}).then(animated=>{
+     void createAnimatedRace({race,characterClass,appearance}).then(animated=>{
        if(this.generation!==generation||!this.slots.includes(slot)){animated.dispose();return;}
        slot.animated=animated;group.add(animated.root);fallback.root.visible=false;
      }).catch(error=>console.warn("Lineup procedural fallback",race,error));

@@ -25,6 +25,7 @@ def validate(path, required):
     names = {a.get("name","") for a in doc.get("animations",[])}
     assert required.issubset(names), f"Missing animation names {required-names}: found {names}"
     print(f"PASS {path}: {len(doc['meshes'])} meshes, {len(doc['skins'])} skins, clips {sorted(names)}")
+    return doc
 
 if __name__ == "__main__":
     folder = sys.argv[1] if len(sys.argv) > 1 else "build/assets"

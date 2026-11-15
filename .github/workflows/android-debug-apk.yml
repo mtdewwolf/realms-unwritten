@@ -39,7 +39,7 @@ jobs:
       - name: Generate playable character assets
         run: |
           mkdir -p apps/client/public/assets
-          python3 -m py_compile tools/blender/generate_races.py tools/blender/render_lineup.py
+          python3 -m py_compile tools/blender/female_mesh.py tools/blender/generate_races.py tools/blender/render_lineup.py
           blender --background --factory-startup --python-exit-code 1 --python tools/blender/generate_characters.py -- --out apps/client/public/assets
           python3 tools/blender/validate_glb.py apps/client/public/assets
           blender --background --factory-startup --python-exit-code 1 --python tools/blender/generate_races.py -- --out apps/client/public/assets
@@ -47,6 +47,9 @@ jobs:
       - name: Render actual eight-race Blender lineup previews
         run: |
           blender --background --factory-startup --python-exit-code 1 --python tools/blender/render_lineup.py -- --assets apps/client/public/assets --out build/lineup-previews
+          blender --background --factory-startup --python-exit-code 1 --python tools/blender/render_lineup.py -- --assets apps/client/public/assets --out build/lineup-previews --body-type female
+          test -s build/lineup-previews/lineup-female-radiant-accord.png
+          test -s build/lineup-previews/lineup-female-umbral-dominion.png
           test -s build/lineup-previews/lineup-radiant-accord.png
           test -s build/lineup-previews/lineup-umbral-dominion.png
       - name: Upload real model preview gallery

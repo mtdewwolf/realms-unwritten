@@ -26,7 +26,8 @@ export function createRaceCharacter(identity:Pick<CharacterIdentity,"race"|"char
  const box=(parent:THREE.Object3D,w:number,h:number,d:number,m:THREE.Material,x=0,y=0,z=0)=>mesh(new THREE.BoxGeometry(w,h,d),m,parent,x,y,z);
  const orb=(parent:THREE.Object3D,r:number,m:THREE.Material,x=0,y=0,z=0)=>mesh(new THREE.IcosahedronGeometry(r,1),m,parent,x,y,z);
  const sturdy=appearance.frame==="sturdy";
- const width=sturdy?1.13:1;
+ const female=appearance.bodyType==="female";
+ const width=(sturdy?1.13:1)*(female?.86:1);
  const torso=box(root,.78*width,.89,.47,armor,0,1.28,0);
  box(root,.81*width,.15,.5,leather,0,.88,0);
  const head=orb(root,identity.race==="ashforged"||identity.race==="hornwarden"?.37:.29,skin,0,2,0);
@@ -44,7 +45,7 @@ export function createRaceCharacter(identity:Pick<CharacterIdentity,"race"|"char
    antler.rotation.z=s*.4;
   }
  }else if(identity.race==="stonehearth"){
-   for(const s of [-1,1])box(root,.22,.35,.19,hair,s*.16,1.85,-.15);
+   if(!female)for(const s of [-1,1])box(root,.22,.35,.19,hair,s*.16,1.85,-.15);
    box(root,.36,.21,.25,metal,0,2.3,-.05);
  }else if(identity.race==="aetheri"){
    for(const s of [-1,1]){
@@ -126,7 +127,7 @@ export function createRaceCharacter(identity:Pick<CharacterIdentity,"race"|"char
   ashforged:[1.42,1.07],hornwarden:[1.47,1.38],hollowborn:[.78,.95],veilkin:[.89,1.06]
  };
  const [broad,tall]=proportions[identity.race];
- root.scale.set(broad,tall,broad);
+ root.scale.set(broad,tall*(female?.94:1),broad);
  return {
   root,
   update(time,moving,attacking){

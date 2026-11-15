@@ -9,7 +9,7 @@ describe("eight-race 3D faction lineups",()=>{
  test("creator renders lineup and allows race selection from stage",()=>{
   const source=readFileSync("apps/client/src/ui/characterCreator.ts","utf8");
   expect(source).toContain("new RaceLineup(");
-  expect(source).toContain("this.lineup.update(this.faction,this.characterClass,this.race)");
+  expect(source).toContain("this.lineup.update(this.faction,this.characterClass,this.race,this.appearance.bodyType)");
   expect(source).toContain("race=>{this.race=race;this.render();}");
  });
 });

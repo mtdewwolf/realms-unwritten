@@ -26,16 +26,23 @@ jobs:
       - name: Generate original rigged characters
         run: |
           blender --background --factory-startup --python-exit-code 1 --python tools/blender/generate_characters.py -- --out build/assets
+          blender --background --factory-startup --python-exit-code 1 --python tools/blender/generate_races.py -- --out build/assets
           test -s build/assets/adventurer.glb
           test -s build/assets/wolf.glb
       - name: Validate GLB skin and animations
-        run: python3 tools/blender/validate_glb.py build/assets
+        run: |
+          python3 tools/blender/validate_glb.py build/assets
+          python3 tools/blender/validate_races.py build/assets
+      - name: Render female faction lineups
+        run: blender --background --factory-startup --python-exit-code 1 --python tools/blender/render_lineup.py -- --assets build/assets --out build/lineup-previews --body-type female
       - name: Generate hashes
         run: sha256sum build/assets/*.glb > build/assets/SHA256SUMS
       - name: Publish source-independent build artifacts
         uses: actions/upload-artifact@v4
         with:
           name: realms-unwritten-character-glbs
-          path: build/assets/
+          path: |
+            build/assets/
+            build/lineup-previews/
           if-no-files-found: error
           retention-days: 30

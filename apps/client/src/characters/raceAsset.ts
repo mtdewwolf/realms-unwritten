@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import {GLTFLoader} from "three/addons/loaders/GLTFLoader.js";
 import {clone as cloneSkinned} from "three/addons/utils/SkeletonUtils.js";
-import {DEFAULT_APPEARANCE,type CharacterAppearance,type CharacterIdentity,type RaceId,type ClassId} from "../../../shared/src/characterCatalog";
+import {DEFAULT_APPEARANCE,type BodyType,type CharacterAppearance,type CharacterIdentity,type RaceId,type ClassId} from "../../../shared/src/characterCatalog";
 import type {AnimationState} from "./animatedAsset";
 
 const RACE_SKINS:Record<RaceId,readonly number[]>={
@@ -20,10 +20,11 @@ type AnimationClipName=typeof actions[number];
 interface RaceTemplate {scene:THREE.Group;animations:THREE.AnimationClip[]}
 const loader=new GLTFLoader();
 const templates=new Map<string,Promise<RaceTemplate>>();
-const assetUrl=(race:RaceId,characterClass:ClassId)=>"/assets/hero-"+race+"-"+characterClass+".glb";
-export function raceAssetUrl(race:RaceId,characterClass:ClassId):string{return assetUrl(race,characterClass);}
-function loadTemplate(race:RaceId,characterClass:ClassId):Promise<RaceTemplate>{
- const url=assetUrl(race,characterClass);
+export function raceAssetUrl(race:RaceId,characterClass:ClassId,bodyType:BodyType=DEFAULT_APPEARANCE.bodyType):string{
+ return `/assets/hero-${race}-${characterClass}${bodyType==="female"?"-female":""}.glb`;
+}
+function loadTemplate(race:RaceId,characterClass:ClassId,bodyType:BodyType):Promise<RaceTemplate>{
+ const url=raceAssetUrl(race,characterClass,bodyType);
  let stored=templates.get(url);
  if(!stored){
   stored=loader.loadAsync(url).then(result=>{
@@ -53,16 +54,16 @@ function shadeMaterial(material:THREE.Material,appearance:CharacterAppearance,ra
 /** Skeleton-safe clone of the original rig; never shares animation state between players. */
 export async function createAnimatedRace(identity:Pick<CharacterIdentity,"race"|"characterClass"> & {appearance?:CharacterAppearance}):Promise<AnimatedRace>{
  const appearance=identity.appearance??DEFAULT_APPEARANCE;
- const template=await loadTemplate(identity.race,identity.characterClass);
+ const template=await loadTemplate(identity.race,identity.characterClass,appearance.bodyType);
  const root=cloneSkinned(template.scene) as THREE.Group;
  const ownedMaterials=new Set<THREE.Material>();
  root.traverse(object=>{
-  if(!(object instanceof THREE.Mesh))return;
   if(object.name.startsWith("RU_HAIR_STYLE_")){
    const value=Number(object.name.match(/RU_HAIR_STYLE_(\d)/)?.[1]??-1);
    object.visible=value===appearance.hairStyle;
   }
   if(object.name.startsWith("RU_MARKING_"))object.visible=appearance.marking!==0;
+  if(!(object instanceof THREE.Mesh))return;
   const materials=Array.isArray(object.material)?object.material:[object.material];
   const replacements=materials.map(m=>{
    const replacement=shadeMaterial(m,appearance,identity.race);

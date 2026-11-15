@@ -1,4 +1,4 @@
-import {FACTIONS,RACES,CLASSES,type CharacterCreation,type FactionId,type RaceId,type ClassId,type CharacterAppearance} from "../../../shared/src/characterCatalog";
+import {FACTIONS,RACES,CLASSES,BODY_TYPES,DEFAULT_APPEARANCE,type CharacterCreation,type FactionId,type RaceId,type ClassId,type CharacterAppearance} from "../../../shared/src/characterCatalog";
 import {RacePreview} from "./racePreview";
 import {RaceLineup} from "./raceLineup";
 
@@ -7,7 +7,7 @@ export class CharacterCreator{
  private faction:FactionId="radiant-accord";
  private race:RaceId="sunborne";
  private characterClass:ClassId="vanguard";
- private appearance:CharacterAppearance={frame:"lean",skinTone:0,hairStyle:0,hairColor:0,marking:0};
+ private appearance:CharacterAppearance={...DEFAULT_APPEARANCE};
  private readonly preview:RacePreview;
  private readonly lineup:RaceLineup;
  private readonly choices:HTMLElement;
@@ -71,6 +71,7 @@ export class CharacterCreator{
    const appearancePanel=this.element.querySelector<HTMLElement>("#creator-appearance")!;
    appearancePanel.replaceChildren();
    const selections=[
+     {key:"bodyType" as const,title:"Body type",names:["Male","Female"]},
      {key:"frame" as const,title:"Build",names:["Lean","Sturdy"]},
      {key:"skinTone" as const,title:"Skin tone",names:["I","II","III","IV"]},
      {key:"hairStyle" as const,title:"Hairstyle",names:["Cropped","Long","Spiked","Braided"]},
@@ -84,16 +85,27 @@ export class CharacterCreator{
        const option=document.createElement("option");
        option.value=String(index);option.textContent=value;select.appendChild(option);
      });
-     select.value=String(setting.key==="frame"?(this.appearance.frame==="lean"?0:1):this.appearance[setting.key]);
+     const { key }=setting;
+     select.value=String(key==="bodyType"?BODY_TYPES.indexOf(this.appearance.bodyType):
+       key==="frame"?Number(this.appearance.frame==="sturdy"):this.appearance[key]);
      select.addEventListener("change",()=>{
        const value=Number(select.value);
-       this.appearance={...this.appearance,[setting.key]:setting.key==="frame"?(value===0?"lean":"sturdy"):value};
+       if(key==="bodyType"){
+         const bodyType=BODY_TYPES[value];
+         if(!bodyType)return;
+         this.appearance={...this.appearance,bodyType};
+         this.lineup.update(this.faction,this.characterClass,this.race,bodyType);
+       }else if(key==="frame"){
+         this.appearance={...this.appearance,frame:value===0?"lean":"sturdy"};
+       }else{
+         this.appearance={...this.appearance,[key]:value};
+       }
        this.preview.update(this.race,this.characterClass,this.appearance);
      });
      label.appendChild(select);appearancePanel.appendChild(label);
    }
    this.preview.update(this.race,this.characterClass,this.appearance);
-   this.lineup.update(this.faction,this.characterClass,this.race);
+   this.lineup.update(this.faction,this.characterClass,this.race,this.appearance.bodyType);
    this.display.textContent=RACES[this.race].name+" · "+CLASSES[this.characterClass].name;
    this.element.style.setProperty("--creator-accent",RACES[this.race].color);
  }
