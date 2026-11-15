@@ -185,7 +185,7 @@ def heroic_detail(rig,race,profession,palette,skin,hair,armor,leather,metal,glow
   piece(rig,"Bracer cuff %s"%s,"arm_"+("L" if s==-1 else "R"),
     (s*.54,-.08,1.11),(.37,.42,.24),bronze if profession=="shadeblade" else metal)
   piece(rig,"Boot armor %s"%s,"leg_"+("L" if s==-1 else "R"),
-    (s*.22,-.11,.25),(.33,.25,.40),leather))
+    (s*.22,-.11,.25),(.33,.25,.40),leather)
   piece(rig,"Belt pouch %s"%s,"hips",(s*.39,-.22,.96),(.24,.2,.33),leather)
   piece(rig,"Pouch clasp %s"%s,"hips",(s*.40,-.35,.98),(.11,.05,.10),gold)
  piece(rig,"Chest emblem","spine",(0,-.285,1.49),(.37,.09,.42),trim,"sphere")
