@@ -12,7 +12,11 @@ import bpy
 RACES={
  "sunborne":{"skin":(.78,.55,.36),"armor":(.26,.43,.57),"hair":(.33,.24,.18)},
  "thornkin":{"skin":(.48,.69,.45),"armor":(.30,.48,.34),"hair":(.28,.39,.19)},
- "ashforged":{"skin":(.49,.30,.28),"armor":(.47,.28,.26),"hair":(.21,.20,.21)},
+ "stonehearth":{"skin":(.76,.45,.30),"armor":(.46,.37,.27),"hair":(.63,.24,.11)},
+ "aetheri":{"skin":(.73,.70,.84),"armor":(.32,.35,.62),"hair":(.82,.78,.86)},
+ "ashforged":{"skin":(.34,.49,.19),"armor":(.54,.22,.18),"hair":(.20,.18,.14)},
+ "hornwarden":{"skin":(.53,.40,.29),"armor":(.38,.29,.22),"hair":(.31,.22,.15)},
+ "hollowborn":{"skin":(.54,.57,.52),"armor":(.28,.30,.28),"hair":(.27,.29,.27)},
  "veilkin":{"skin":(.59,.51,.70),"armor":(.30,.30,.49),"hair":(.18,.15,.28)}
 }
 CLASSES=("vanguard","spellweaver","shadeblade")
@@ -89,6 +93,128 @@ def animate(rig):
   strip.action_frame_start=frames[0][0];strip.action_frame_end=frames[-1][0]
  rig.animation_data.action=None;rig.select_set(False)
 
+
+# All designs are original. These silhouette rules are not copied from Warcraft meshes.
+# Major geometries are mesh shapes rather than primitive box-only placeholders.
+PROPORTIONS={
+ "sunborne":(1.08,1.13),
+ "thornkin":(1.15,.94),
+ "stonehearth":(.76,1.32),
+ "aetheri":(1.15,.87),
+ "ashforged":(1.08,1.43),
+ "hornwarden":(1.37,1.46),
+ "hollowborn":(.96,.78),
+ "veilkin":(1.06,.89)
+}
+def heroic_detail(rig,race,profession,palette,skin,hair,armor,leather,metal,glow,dark):
+ gold=mat("RU_GOLD",(.78,.55,.21))
+ bronze=mat("RU_BRONZE",(.47,.29,.16))
+ steel=mat("RU_STEEL",(.58,.64,.70))
+ trim=mat("RU_TRIM",(.84,.70,.43) if race in ("sunborne","aetheri","stonehearth") else (.62,.37,.33))
+ eye=mat("RU_EYE",(.30,.83,.87) if race in ("aetheri","veilkin") else (.82,.65,.30))
+ pearl=mat("RU_PEARL",(.90,.88,.79))
+ cloak=mat("RU_CLOAK",(.24,.35,.46) if race in ("sunborne","aetheri") else (.27,.19,.31))
+ # Large, visible facial geometry: chin, nose, eyes, brow and lip.
+ head_depth=.51 if race in ("ashforged","hornwarden") else .43
+ facew=.54 if race in ("ashforged","hornwarden") else .45
+ piece(rig,"Jaw sculpt","head",(0,-.055,1.91),(facew,head_depth,.33),skin,"sphere")
+ piece(rig,"Nose bridge","head",(0,-.24,2.04),(.16,.18,.25),skin,"sphere")
+ piece(rig,"Nose tip","head",(0,-.34,1.99),(.18,.14,.11),skin,"sphere")
+ for side,s in (("L",-1),("R",1)):
+  piece(rig,"Eye socket "+side,"head",(s*.135,-.244,2.12),(.155,.085,.12),dark,"sphere")
+  piece(rig,"Eye iris "+side,"head",(s*.135,-.309,2.12),(.075,.06,.08),eye,"sphere")
+  brow=piece(rig,"Expression brow "+side,"head",(s*.14,-.282,2.22),(.23,.075,.09),hair)
+  brow.rotation_euler[1]=s*.09
+  piece(rig,"Cheek "+side,"head",(s*.25,-.165,1.94),(.23,.23,.16),skin,"sphere")
+ piece(rig,"Mouth line","head",(0,-.291,1.86),(.19,.045,.045),dark)
+ if race=="stonehearth":
+  piece(rig,"Stout deep beard","head",(0,-.16,1.76),(.53,.40,.59),hair,"sphere")
+  for s in (-1,1):
+   braid=piece(rig,"Tied beard braid %s"%s,"head",(s*.21,-.36,1.49),(.17,.18,.47),hair,"cylinder")
+   piece(rig,"Braided gold bead %s"%s,"head",(s*.21,-.36,1.3),(.22,.22,.09),gold,"cylinder")
+  piece(rig,"Forge goggles bridge","head",(0,-.3,2.31),(.5,.12,.14),bronze)
+  for s in (-1,1):
+   piece(rig,"Forge goggle lens %s"%s,"head",(s*.18,-.34,2.31),(.26,.09,.22),gold,"cylinder")
+  piece(rig,"Engineering harness","spine",(0,-.30,1.4),(.72,.16,.30),bronze)
+ elif race=="ashforged":
+  for s in (-1,1):
+   piece(rig,"Lower tusk %s"%s,"head",(s*.21,-.36,1.84),(.15,.13,.31),pearl,"cone")
+   piece(rig,"Iron shoulder spike %s"%s,"spine",(s*.68,-.01,1.89),(.36,.36,.66),steel,"cone")
+  piece(rig,"Heavy jaw","head",(0,-.26,1.85),(.57,.37,.28),skin,"sphere")
+ elif race=="hornwarden":
+  piece(rig,"Broad muzzle","head",(0,-.29,1.97),(.66,.39,.32),skin,"sphere")
+  for s in (-1,1):
+   horn=piece(rig,"Great curved horn %s"%s,"head",(s*.49,0,2.39),(.28,.25,.88),pearl,"cone")
+   horn.rotation_euler[1]=s*.55
+   piece(rig,"Horn ferrule %s"%s,"head",(s*.45,0,2.22),(.36,.35,.18),bronze,"cylinder")
+  piece(rig,"Shoulder pelt","spine",(0,.28,1.54),(1.1,.68,.34),leather,"sphere")
+  piece(rig,"Ancestral totem","spine",(0,.37,1.69),(.18,.24,1.45),bronze)
+ elif race=="hollowborn":
+  piece(rig,"Sunken cheek mask","head",(0,-.22,1.92),(.48,.26,.38),skin,"sphere")
+  for s in (-1,1):
+   piece(rig,"Hollow cheek ridge %s"%s,"head",(s*.24,-.30,1.94),(.12,.09,.26),steel)
+  piece(rig,"Torn collar","spine",(0,.20,1.66),(.72,.48,.28),dark)
+  for s in (-1,1):
+   piece(rig,"Blight potion %s"%s,"hips",(s*.37,-.2,.93),(.17,.18,.35),glow,"cylinder")
+ elif race=="aetheri":
+  for s in (-1,1):
+   ear=piece(rig,"Arcane swept ear %s"%s,"head",(s*.39,0,2.12),(.34,.20,.52),skin,"cone")
+   ear.rotation_euler[1]=s*.95
+  piece(rig,"Floating circlet","head",(0,-.03,2.4),(.67,.55,.15),gold,"cylinder")
+  piece(rig,"Arcane crystal brow","head",(0,-.3,2.38),(.14,.14,.22),glow,"sphere")
+ elif race=="thornkin":
+  for s in (-1,1):
+   antler=piece(rig,"Branched antler %s"%s,"head",(s*.27,-.03,2.61),(.16,.18,.74),bronze,"cone")
+   antler.rotation_euler[1]=s*.5
+   piece(rig,"Leaf mantle %s"%s,"spine",(s*.48,-.07,1.71),(.59,.55,.37),armor,"sphere")
+  piece(rig,"Druidic neck charm","spine",(0,-.27,1.58),(.23,.16,.27),glow,"sphere")
+ elif race=="veilkin":
+  for s in (-1,1):
+   ear=piece(rig,"Shadow ear %s"%s,"head",(s*.40,-.04,2.14),(.30,.20,.55),skin,"cone")
+   ear.rotation_euler[1]=s*1.0
+   piece(rig,"Veil rune %s"%s,"head",(s*.23,-.27,1.92),(.10,.05,.15),glow)
+  piece(rig,"Mystic crest","head",(0,-.23,2.41),(.24,.14,.29),glow,"sphere")
+ else:
+  piece(rig,"Golden brow crown","head",(0,-.04,2.43),(.70,.53,.14),gold,"cylinder")
+  piece(rig,"Sun herald crest","spine",(0,-.32,1.46),(.34,.09,.34),gold,"sphere")
+ # A strong chest silhouette and thick, visually legible class gear.
+ for s in (-1,1):
+  pauldron=piece(rig,"RU_HEROIC_PAULDRON_%s"%s,"spine",(s*.59,-.05,1.72),
+   (.65,.71,.36),metal if profession=="vanguard" else armor,"sphere")
+  piece(rig,"Shoulder edge %s"%s,"spine",(s*.67,-.17,1.64),(.50,.37,.14),trim)
+  piece(rig,"Bracer cuff %s"%s,"arm_"+("L" if s==-1 else "R"),
+    (s*.54,-.08,1.11),(.37,.42,.24),bronze if profession=="shadeblade" else metal)
+  piece(rig,"Boot armor %s"%s,"leg_"+("L" if s==-1 else "R"),
+    (s*.22,-.11,.25),(.39,.46,.35),leather,"sphere")
+  piece(rig,"Belt pouch %s"%s,"hips",(s*.39,-.22,.96),(.24,.2,.33),leather)
+  piece(rig,"Pouch clasp %s"%s,"hips",(s*.40,-.35,.98),(.11,.05,.10),gold)
+ piece(rig,"Chest emblem","spine",(0,-.285,1.49),(.37,.09,.42),trim,"sphere")
+ piece(rig,"Gilded belt buckle","hips",(0,-.31,.95),(.30,.10,.24),gold)
+ if profession=="vanguard":
+  piece(rig,"Overlapping cuirass","spine",(0,-.31,1.38),(.74,.13,.52),steel)
+  for s in (-1,1):
+   piece(rig,"Shield crest rivet %s"%s,"arm_L",(s*.24,-.37,1.22),(.10,.09,.13),gold,"sphere")
+   piece(rig,"Cuirass trim %s"%s,"spine",(s*.32,-.38,1.4),(.07,.09,.50),gold)
+  piece(rig,"Tower shield face","arm_L",(-.68,-.38,1.28),(.88,.16,1.02),steel)
+  piece(rig,"Shield boss","arm_L",(-.68,-.50,1.28),(.41,.12,.41),gold,"sphere")
+  blade=piece(rig,"Great sword tapered edge","arm_R",(.66,-.05,.59),(.25,.14,1.3),steel,"cone")
+  blade.rotation_euler[0]=.12
+ elif profession=="spellweaver":
+  piece(rig,"Arcane robe skirt","hips",(0,0,.66),(.87,.64,1.27),armor,"cone")
+  piece(rig,"Glowing chest jewel","spine",(0,-.31,1.53),(.23,.14,.35),glow,"sphere")
+  for s in (-1,1):
+   piece(rig,"Robe embroidery %s"%s,"hips",(s*.33,-.27,.62),(.1,.08,.89),gold)
+   piece(rig,"Crystal pauldron %s"%s,"spine",(s*.63,-.06,1.9),(.34,.35,.51),glow,"cone")
+  piece(rig,"Rune staff tip","arm_R",(.63,-.14,1.92),(.47,.43,.54),glow,"sphere")
+ elif profession=="shadeblade":
+  piece(rig,"Hooded mantle","spine",(0,.26,1.54),(.92,.16,.59),cloak)
+  piece(rig,"Assassin scarf","head",(0,-.23,1.87),(.48,.21,.22),cloak)
+  for s in (-1,1):
+   piece(rig,"Swept blade tip %s"%s,"arm_"+("L" if s==-1 else "R"),
+    (s*.59,-.13,.56),(.19,.13,.76),steel,"cone")
+   piece(rig,"Assassin belt vial %s"%s,"hips",(s*.42,-.21,.85),(.16,.13,.29),glow,"cylinder")
+ return
+
 def hero(out,race,profession):
  reset();rig=skeleton();palette=RACES[race]
  skin=mat("RU_SKIN",palette["skin"])
@@ -98,7 +224,7 @@ def hero(out,race,profession):
  metal=mat("RU_METAL",(.63,.66,.67))
  glow=mat("RU_GLOW",(.95,.73,.37) if race in ("sunborne","thornkin") else (.66,.40,.79))
  dark=mat("RU_DARK",(.12,.14,.17))
- width=1.12 if race=="ashforged" else .9 if race=="veilkin" else 1.0
+ width=PROPORTIONS[race][1]
  piece(rig,"Coat","spine",(0,0,1.37),(.72*width,.50,.82),armor)
  piece(rig,"Belt","hips",(0,0,.95),(.78*width,.52,.14),leather)
  piece(rig,"Face","head",(0,0,2.02),(.50,.43,.55),skin,"sphere")
@@ -144,7 +270,10 @@ def hero(out,race,profession):
   for side,s in (("L",-1),("R",1)):
    piece(rig,"Moonsteel dagger "+side,"arm_"+side,(s*.59,-.13,.85),(.12,.14,.8),metal)
    piece(rig,"Dagger guard "+side,"arm_"+side,(s*.59,-.13,1.01),(.24,.17,.11),leather)
+ heroic_detail(rig,race,profession,palette,skin,hair,armor,leather,metal,glow,dark)
  animate(rig)
+ height_scale,width_scale=PROPORTIONS[race]
+ rig.scale=(width_scale,width_scale,height_scale)
  os.makedirs(out,exist_ok=True)
  path=os.path.join(out,"hero-%s-%s.glb"%(race,profession))
  bpy.ops.object.select_all(action="DESELECT");rig.select_set(True)
