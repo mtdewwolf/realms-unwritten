@@ -7,11 +7,11 @@ Inspired by the design pattern of rival factions in classic faction-based MMORPG
 **The Umbral Dominion** (nominally evil) pursues power through forbidden knowledge and conquest. Races: **Ashforged** (volcanic smith-clans) and **Veilkin** (shadow-adapted scholars). Members of either faction can be moral or immoral as individuals.
 
 ## Starting classes
-- **Vanguard:** armored frontline warrior
-- **Spellweaver:** future magical damage/support
-- **Shadeblade:** future agile melee/scouting
+- **Vanguard:** armored frontline warrior. Starter kit: Bulwark.
+- **Spellweaver:** ranged magical damage and support. Starter kit: Arc Bolt, Starfall, Mend, and Aether Ward.
+- **Shadeblade:** agile melee and scouting. Starter kit: Quickstrike, Shadowstep, Veil, and Keen Senses.
 
-All three classes use existing combat mechanics at launch. **Class-specific skills, mana, equipment restrictions, faction territories, racial passives, and faction PvP are future features**, not falsely claimed as implemented. Balance before enabling abilities.
+The starter kits are enforced by the realm server. See [Race models and class abilities](RACE_MODELS_AND_CLASSES.md) for costs, ranges, and cooldowns. **Mana, talent trees, equipment restrictions, faction territories, racial passives, and faction PvP are still future work.**
 
 ## Server architecture
 - New guests connecting without a token receive \`creation_required\`, not a created character.
@@ -25,4 +25,4 @@ All three classes use existing combat mechanics at launch. **Class-specific skil
 Run Bun typecheck, unit tests, live WebSocket smoke, web build and Android APK. Test all four race choices, three classes, faction/race validation, name validation, persistent login, multiple separate guests, and the existing guest migration path. Test the creator in portrait and landscape and with the Android soft keyboard. Test multiplayer/quest access cannot bypass creation.
 
 ## Next slices
-Character art variations and live 3D preview; class-specific starter abilities and balancing; faction settlement spawns, NPC dialogue and quests; character selection for multiple heroes per account; persistence and identity security hardening.
+Class talent trees and balance passes beyond the starter kits; faction settlement spawns, NPC dialogue and quests; character selection for multiple heroes per account; persistence and identity security hardening.

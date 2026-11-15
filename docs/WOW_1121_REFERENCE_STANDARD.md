@@ -31,7 +31,7 @@ Study the *systems, relative pacing, constraints and interdependence* of vanilla
 | --- | --- | --- | --- |
 | Factions | Two enduring sides with unique identity | Radiant Accord vs Umbral Dominion | Choice persists |
 | Races | Character silhouette, origin, race limitations | Sunborne, Thornkin, Ashforged, Veilkin | Selection only, no distinct race meshes |
-| Classes | Distinct tactical/resource identities | Vanguard (defense), Spellweaver (spellcasting), Shadeblade (mobility) | Choice persists; abilities not yet distinct |
+| Classes | Distinct tactical/resource identities | Vanguard (defense), Spellweaver (spellcasting and support), Shadeblade (mobility and scouting) | Starter kits are server-enforced; talent trees are still proposed |
 | Starter regions | Race/faction homelands and initial narrative | Accord: Verdant Reach; Dominion: Ashen Verge (new) | Verdant Reach exists; Dominion region proposed |
 | Mid-level territory | Shared contested regions and travel danger | The Shattered Marches (new) | Proposed |
 | Class customization | Training and talent trees | Three original paths per class, unlock from level 10 | Proposed |

@@ -19,7 +19,9 @@ import { CharacterCreator } from "./ui/characterCreator";
 import {TitleScreen} from "./ui/titleScreen";
 import {createRaceCharacter} from "./characters/raceModel";
 import {createAnimatedRace,type AnimatedRace} from "./characters/raceAsset";
-import {DEFAULT_APPEARANCE,type ClassId} from "../../shared/src/characterCatalog";
+import {DEFAULT_APPEARANCE} from "../../shared/src/characterCatalog";
+import {AbilityBar} from "./ui/abilityBar";
+import {describeAbilityResult} from "./ui/abilityFeedback";
 import { moveWithCollision } from "./world/collision";
 import { settlementsNear, discoverySettlements } from "./world/settlements";
 import { createWolf } from "./characters/rig";
@@ -125,10 +127,8 @@ let title:TitleScreen;
 inventoryPanel.button.addEventListener("click",()=>multiplayer.requestInventory());
 let onlineWolf:ServerWolf|null=null;
 let lastServerStrikePhase="";
-let activeClass:ClassId="vanguard";
-let abilityCooldownAt=0;
-const abilityLabels:Record<ClassId,string>={vanguard:"BULWARK",spellweaver:"ARC BOLT",shadeblade:"QUICKSTRIKE"};
-const abilityNames:Record<ClassId,"bulwark"|"arc-bolt"|"quickstrike">={vanguard:"bulwark",spellweaver:"arc-bolt",shadeblade:"quickstrike"};
+let abilityBar:AbilityBar|null=null;
+let castingUntil=0;
 const multiplayer = new MultiplayerClient(scene, avatar,
   text=>{status.textContent=text;if(title?.visible)title.message(text);},
   (vitals:ServerVitals,wolfState:ServerWolf|null)=>{
@@ -166,6 +166,7 @@ const multiplayer = new MultiplayerClient(scene, avatar,
     inventoryPanel.offline();
     questPanel.offline();
     characterPanel.offline();
+    abilityBar?.reset();
     app.classList.remove("game-entered");
     if(title)title.show();
   },
@@ -186,21 +187,21 @@ const multiplayer = new MultiplayerClient(scene, avatar,
       if(generation!==rigGeneration){rig.dispose();return;}
       riggedPlayer=rig;avatar.add(rig.root);adventurer.root.visible=false;
     }).catch(error=>console.warn("Using procedural race fallback",error));
-    activeClass=identity.characterClass;
-    abilityCooldownAt=0;
-    const control=document.querySelector<HTMLButtonElement>("#class-ability");
-    if(control)control.querySelector("span")!.textContent=abilityLabels[activeClass];
+    abilityBar?.setClass(identity.characterClass);
   },
   result=>{
-    if(result.ok){
-      abilityCooldownAt=performance.now()+result.cooldownSeconds*1000;
-      combatVisuals.emit(result.ability==="arc-bolt"?"arc-bolt":
-        result.ability==="quickstrike"?"quickstrike":"bulwark",avatar.position,wolf.position);
-      battleInfo.textContent=result.ability==="bulwark"?"Bulwark active · reduced incoming damage":
-        result.ability==="arc-bolt"?"Arc Bolt hit · wolf HP "+result.wolfHealth:
-        "Quickstrike hit · wolf HP "+result.wolfHealth;
-      if(result.ability!=="bulwark")attackingUntil=performance.now()/1000+.35;
-    }else battleInfo.textContent=result.reason??"Class ability rejected";
+    if(result.cooldownSeconds>0)abilityBar?.note(result.ability,result.cooldownSeconds);
+    if(!result.ok){battleInfo.textContent=result.reason??"Class ability rejected";return;}
+    const feedback=describeAbilityResult(result);
+    const seconds=performance.now()/1000;
+    const scout=result.scout?.wolf;
+    const from=feedback.anchor==="scout"&&scout?new THREE.Vector3(scout.x,avatar.position.y,scout.z):avatar.position;
+    const to=feedback.anchor==="wolf"?wolf.position:from;
+    combatVisuals.emit(feedback.visual,from,to);
+    battleInfo.textContent=feedback.text;
+    if(feedback.gesture==="strike")attackingUntil=seconds+.35;
+    if(feedback.gesture==="cast")castingUntil=seconds+.45;
+    if(result.position)multiplayer.adoptServerPosition(result.position.x,result.position.z);
   },
   ()=>title.authRequired(),
   hasCharacter=>{title.authenticated();title.message(hasCharacter?"Account loaded · entering world":"Account ready · create your character");},
@@ -365,14 +366,9 @@ dodgeButton.id="dodge";
 dodgeButton.innerHTML='↝<span>DODGE</span>';
 document.querySelector("#actions")!.prepend(dodgeButton);
 dodgeButton.addEventListener("click",dodge);
-const abilityButton=document.createElement("button");
-abilityButton.id="class-ability";abilityButton.type="button";
-abilityButton.innerHTML='✦<span>BULWARK</span>';
-document.querySelector("#actions")!.appendChild(abilityButton);
-abilityButton.addEventListener("click",()=>{
+abilityBar=new AbilityBar(app,ability=>{
   if(!multiplayer.connected){battleInfo.textContent="Class abilities require the Bun server";return;}
-  if(performance.now()<abilityCooldownAt){battleInfo.textContent="Ability is cooling down";return;}
-  multiplayer.sendClassAbility(abilityNames[activeClass]);
+  multiplayer.sendClassAbility(ability);
 });
 let previous = performance.now();
 let elapsed = 0;
@@ -391,10 +387,7 @@ function frame(now: number) {
   elapsed += dt;
   if(!multiplayer.connected)playerStamina = regenerateStamina(playerStamina,dt);
   staminaDisplay.value=playerStamina;
-  const remaining=Math.ceil((abilityCooldownAt-now)/1000);
-  const abilityLabel=abilityButton.querySelector("span")!;
-  abilityLabel.textContent=remaining>0?abilityLabels[activeClass]+" "+remaining+"s":abilityLabels[activeClass];
-  abilityButton.disabled=remaining>0;
+  abilityBar?.update(now);
   const x = axisX + Number(keys.has("d")) - Number(keys.has("a"));
   const z = axisZ + Number(keys.has("s")) - Number(keys.has("w"));
   const length = Math.hypot(x, z);
@@ -417,9 +410,10 @@ function frame(now: number) {
     multiplayer.sendMovement(command,now);
   }
   multiplayer.update(dt,groundHeightAt);
-  adventurer.update(elapsed,length>0.05 && playerHealth>0,now/1000<attackingUntil);
-  const playerState: AnimationState = now/1000<attackingUntil ? "attack" :
-    now/1000<dodgeUntil ? "dodge" : length>0.05 && playerHealth>0 ? "walk" : "idle";
+  adventurer.update(elapsed,length>0.05 && playerHealth>0,now/1000<attackingUntil||now/1000<castingUntil);
+  const playerState = now/1000<attackingUntil ? "attack" as const :
+    now/1000<castingUntil ? "cast" as const :
+    now/1000<dodgeUntil ? "dodge" as const : length>0.05 && playerHealth>0 ? "walk" as const : "idle" as const;
   riggedPlayer?.setState(playerState);
   riggedPlayer?.update(dt);
   const wolfDistance = Math.hypot(avatar.position.x-wolf.position.x,avatar.position.z-wolf.position.z);

@@ -22,7 +22,7 @@ Today’s build is one Bun process and one SQLite file: accounts, one shared wol
 
 ## Feature overview
 
-The client is a Three.js scene in a Vite app, wrapped for Android with Capacitor. The realm server in `apps/server` owns accounts, positions, the wolf, inventory, quests, gathering, and crafting. The wire protocol is **version 11** (`PROTOCOL_VERSION` in `apps/server/src/protocol.ts`). Client and server have to be from the same protocol generation.
+The client is a Three.js scene in a Vite app, wrapped for Android with Capacitor. The realm server in `apps/server` owns accounts, positions, the wolf, inventory, quests, gathering, and crafting. The wire protocol is **version 12** (`PROTOCOL_VERSION` in `apps/server/src/protocol.ts`). Client and server have to be from the same protocol generation.
 
 | Area | What the current code does |
 | --- | --- |
@@ -32,7 +32,7 @@ The client is a Three.js scene in a Vite app, wrapped for Android with Capacitor
 | Quests | One quest, Wolf Hunt, offered by the Verdant Reach guard. |
 | Gathering | Iron ore and Moonleaf, taken from the server position, with shared node cooldowns in SQLite. |
 | Crafting | Ironblade and Healing Tonic, only beside that guard. |
-| Combat | One shared starter wolf. Attack, dodge, and three class abilities are server-checked. |
+| Combat | One shared starter wolf. Attack, dodge, and the class ability kits are server-checked. |
 | Movement | The server simulates at 20 Hz and snapshots at 10 Hz. The client predicts with the same movement step. |
 | World | A 16,384 m square streamed in 64 m chunks. Discoveries and the atlas stay on the device. |
 | Ideas board | Private kanban in `apps/kanban`, separate from the realm server, with its own SQLite file. |
@@ -57,13 +57,19 @@ Creation sends `create_character` with a name, faction, race, and class. A name 
 
 Classes are **Vanguard**, **Spellweaver**, and **Shadeblade**. Each pair is a rigged model, `hero-<race>-<class>.glb`, with clips `idle`, `walk`, `attack`, `dodge`, `cast`, and `death`. The creator shows a tap-selectable lineup of the four races in the chosen faction. If a GLB is missing, the procedural race mesh stays visible.
 
-Class abilities are checked on the server against the saved class:
+Class abilities are checked on the server against the saved class. Each ability has its own cooldown. A packet cannot set damage, healing, duration, or destination, and it cannot cast another class's ability. The client shows the kit on a touch ability bar and plays a short effect only after the server accepts the cast.
 
 | Class | Ability | Server rule |
 | --- | --- | --- |
 | Vanguard | Bulwark | 22 stamina. For 4 seconds, the wolf bite of 12 is reduced to 6. Cooldown 14 seconds. |
 | Spellweaver | Arc Bolt | 30 stamina, 28 damage, up to 9 meters. Cooldown 9 seconds. |
+| Spellweaver | Starfall | 34 stamina, 18 damage if the wolf is within 6.5 meters of the caster. Cooldown 12 seconds. |
+| Spellweaver | Mend | 26 stamina. Restores 22 health to the most injured living ally within 10 meters, or to the caster when no ally is hurt. Cooldown 11 seconds. |
+| Spellweaver | Aether Ward | 20 stamina. For 3 seconds, a wolf bite is reduced by 4. An injured ally within 10 meters is preferred; otherwise the caster is warded. Bulwark still takes priority on a Vanguard. Cooldown 13 seconds. |
 | Shadeblade | Quickstrike | 25 stamina, 34 damage, within 3.25 meters. Cooldown 7 seconds. |
+| Shadeblade | Shadowstep | 28 stamina. If the wolf is within 8 meters, the server moves the caster to 2.2 meters away and deals 18 damage. A blocked path is rejected before stamina is spent. Cooldown 10 seconds. |
+| Shadeblade | Veil | 18 stamina. For 4 seconds the wolf will not target the caster. Attack, Quickstrike, and Shadowstep end it. Dodge does not. Cooldown 16 seconds. |
+| Shadeblade | Keen Senses | 14 stamina. Reports the wolf when it is within 28 meters and counts living allies within 24 meters. No damage. Cooldown 8 seconds. |
 
 ### Inventory, quests, gathering, and crafting
 
@@ -91,7 +97,7 @@ Player health and stamina (both cap at 100) reset when you rejoin. Inventory, co
 `GET /health` returns JSON:
 
 ```json
-{"ok":true,"game":"realms-unwritten","protocol":11,"players":0,"wolfHealth":60}
+{"ok":true,"game":"realms-unwritten","protocol":12,"players":0,"wolfHealth":60}
 ```
 
 `GET /ws` upgrades to a WebSocket. Any other path returns the text `Realms Unwritten authoritative movement prototype`.
@@ -117,7 +123,7 @@ In the world, **☰ MENU** opens Map, Backpack, Quests, Character, and Multiplay
 │   └── capacitor.config.ts
 ├── apps/server/                 # @realms/server — Bun HTTP + WebSocket
 │   ├── src/index.ts             # Process entry, /health, /ws, shutdown
-│   ├── src/protocol.ts          # Protocol 11 and message checks
+│   ├── src/protocol.ts          # Protocol 12 and message checks
 │   ├── src/accounts.ts
 │   ├── src/simulation.ts
 │   ├── src/combat.ts
@@ -375,7 +381,7 @@ The Android workflow is the full gate: `bun run check`, `bun test`, Blender gene
 
 ## Further reading
 
-The notes in `docs/` go into each system as it was added. Where a note still names an older protocol version, an earlier four-race roster, or a system as absent, this README and the source are the current description. Protocol 11 is the live version in `apps/server/src/protocol.ts`.
+The notes in `docs/` go into each system as it was added. Where a note still names an older protocol version, an earlier four-race roster, or a system as absent, this README and the source are the current description. Protocol 12 is the live version in `apps/server/src/protocol.ts`.
 
 **Play**
 

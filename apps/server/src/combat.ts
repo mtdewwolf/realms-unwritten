@@ -1,7 +1,10 @@
 import {randomUUID} from "node:crypto";
 /** Deterministic server-owned starter wolf encounter; no client health or coordinates accepted. */
+import {moveWithCollision} from "../../client/src/world/collision";
 import type {WorldSimulation,SimPlayer} from "./simulation";
 import type {ClassId} from "../../shared/src/characterCatalog";
+import {ABILITY_SPECS,classOwnsAbility,isClassAbility,type AbilitySpec,type ClassAbility} from "../../shared/src/classAbilities";
+import type {AbilityScout,ClassAbilityResult} from "./protocol";
 
 export const WOLF_ID="starter-wolf-v1";
 export const MAX_HEALTH=100;
@@ -14,10 +17,9 @@ export const BITE_DAMAGE=12;
 export const ATTACK_RANGE=3.25;
 export const TICK_SECONDS=0.05;
 export type CombatAction="attack"|"dodge";
-export type ClassAbility="bulwark"|"arc-bolt"|"quickstrike";
-export interface AbilityPacket{type:"ability";seq:number;ability:ClassAbility;damage?:never}
-export interface AbilityResult{type:"ability_result";seq:number;ability:ClassAbility;ok:boolean;reason?:string;wolfHealth:number;health:number;stamina:number;cooldownSeconds:number}
-export const CLASS_ABILITY:Record<ClassId,ClassAbility>={vanguard:"bulwark",spellweaver:"arc-bolt",shadeblade:"quickstrike"};
+export type {ClassAbility};
+export interface AbilityPacket{type:"ability";seq:number;ability:ClassAbility;target?:string;damage?:never}
+export type AbilityResult=ClassAbilityResult;
 export interface ActionPacket {type:"action";seq:number;action:CombatAction;target?:string}
 export type WolfPhase="idle"|"chase"|"windup"|"strike"|"dead";
 export interface WolfView {id:string;x:number;z:number;heading:number;health:number;maxHealth:number;phase:WolfPhase;windupUntil:number}
@@ -29,8 +31,10 @@ export interface CombatPlayer extends VitalView {
   dodgeUntil:number;
   respawnAt:number;
   lastActionSeq:number;
-  abilityReadyAt:number;
+  abilityReadyAt:Partial<Record<ClassAbility,number>>;
   bulwarkUntil:number;
+  wardUntil:number;
+  veilUntil:number;
 }
 export function parseAction(raw:unknown):ActionPacket|null {
   if(!raw||typeof raw!=="object")return null;
@@ -57,7 +61,7 @@ export class CombatSimulation {
   constructor(readonly world:WorldSimulation){}
   join(id:string):void{
     this.players.set(id,{health:MAX_HEALTH,stamina:MAX_STAMINA,maxHealth:MAX_HEALTH,maxStamina:MAX_STAMINA,
-      alive:true,attackReadyAt:0,dodgeReadyAt:0,dodgeUntil:0,respawnAt:0,lastActionSeq:-1,abilityReadyAt:0,bulwarkUntil:0});
+      alive:true,attackReadyAt:0,dodgeReadyAt:0,dodgeUntil:0,respawnAt:0,lastActionSeq:-1,abilityReadyAt:{},bulwarkUntil:0,wardUntil:0,veilUntil:0});
   }
   leave(id:string):void{
     this.players.delete(id);
@@ -108,6 +112,7 @@ export class CombatSimulation {
     // Costs apply to valid attacks even when out of range.
     p.stamina-=ATTACK_COST;
     p.attackReadyAt=this.time+.65;
+    p.veilUntil=0;
     if(this.wolf.phase==="dead")return result(false,"wolf defeated");
     if(range(actor,this.wolf)>ATTACK_RANGE)return result(false,"target out of range");
     const damage=this.resolveAttackDamage?.(id)??ATTACK_DAMAGE;
@@ -127,36 +132,167 @@ export class CombatSimulation {
     }
   }
   useAbility(id:string,raw:unknown):AbilityResult|null{
-    if(!raw||typeof raw!=="object")return null;
-    const packet=raw as Record<string,unknown>;
-    if(packet.type!=="ability"||!Number.isSafeInteger(packet.seq)||typeof packet.seq!=="number"||packet.seq<0||
-       (packet.ability!=="bulwark"&&packet.ability!=="arc-bolt"&&packet.ability!=="quickstrike"))return null;
+    const packet=this.parseAbility(raw);
     const p=this.players.get(id),actor=this.world.players.get(id);
-    if(!p||!actor)return null;
-    const ability=packet.ability as ClassAbility;
-    const result=(ok:boolean,reason?:string):AbilityResult=>({
-      type:"ability_result",seq:packet.seq as number,ability,ok,reason,
+    if(!packet||!p||!actor)return null;
+    const ability=packet.ability;
+    const result=(ok:boolean,reason?:string,extra?:Partial<AbilityResult>):AbilityResult=>({
+      type:"ability_result",seq:packet.seq,ability,ok,...(reason?{reason}:{}),
       wolfHealth:this.wolf.health,health:p.health,stamina:p.stamina,
-      cooldownSeconds:Math.max(0,p.abilityReadyAt-this.time)
+      cooldownSeconds:Math.max(0,(p.abilityReadyAt[ability]??0)-this.time),
+      ...extra
     });
     if(packet.seq<=p.lastActionSeq)return result(false,"stale action");
     p.lastActionSeq=packet.seq;
     if(!p.alive)return result(false,"you are defeated");
     const cls=this.resolveClass?.(id);
-    if(!cls||CLASS_ABILITY[cls]!==ability)return result(false,"ability unavailable to this class");
-    if(this.time<p.abilityReadyAt)return result(false,"ability cooling down");
-    const cost=ability==="bulwark"?22:ability==="arc-bolt"?30:25;
-    if(p.stamina<cost)return result(false,"not enough stamina");
-    if(ability!=="bulwark"){
-      if(this.wolf.phase==="dead")return result(false,"wolf defeated");
-      const maxRange=ability==="arc-bolt"?9:ATTACK_RANGE;
-      if(range(actor,this.wolf)>maxRange)return result(false,"target out of range");
+    if(!cls||!classOwnsAbility(cls,ability))return result(false,"ability unavailable to this class");
+    if(this.time<(p.abilityReadyAt[ability]??0))return result(false,"ability cooling down");
+    const spec=ABILITY_SPECS[ability];
+    if(p.stamina<spec.stamina)return result(false,"not enough stamina");
+    // Damage, heal, duration, and destination on the packet are ignored.
+    const planned=this.planAbility(id,actor,spec,packet.target);
+    if("error" in planned)return result(false,planned.error);
+    p.stamina-=spec.stamina;
+    p.abilityReadyAt[ability]=this.time+spec.cooldown;
+    if(planned.breakVeil)p.veilUntil=0;
+    if(planned.barrier)p.bulwarkUntil=this.time+(spec.duration??0);
+    if(planned.veil)p.veilUntil=this.time+(spec.duration??0);
+    if(planned.wardId){
+      const ward=this.players.get(planned.wardId);
+      if(ward)ward.wardUntil=this.time+(spec.duration??0);
     }
-    p.stamina-=cost;
-    p.abilityReadyAt=this.time+(ability==="bulwark"?14:ability==="arc-bolt"?9:7);
-    if(ability==="bulwark")p.bulwarkUntil=this.time+4;
-    else this.damageWolf(id,ability==="arc-bolt"?28:34);
-    return result(true);
+    let position:AbilityResult["position"];
+    if(planned.dash)position=this.shadeStep(actor,spec.stopDistance??ATTACK_RANGE,true);
+    if(planned.damage)this.damageWolf(id,planned.damage);
+    let healedHealth:number|undefined;
+    if(planned.healId){
+      const patient=this.players.get(planned.healId);
+      if(patient){
+        patient.health=Math.min(patient.maxHealth,patient.health+(spec.heal??0));
+        healedHealth=patient.health;
+      }
+    }
+    const subjectId=planned.healId??planned.wardId;
+    return result(true,undefined,{
+      ...(subjectId?{subjectId,subjectSelf:subjectId===id}:{}),
+      ...(planned.healId?{healedId:planned.healId,healedHealth}:{}),
+      ...(position?{position}:{}),
+      ...(planned.scout?{scout:planned.scout}:{})
+    });
+  }
+  private parseAbility(raw:unknown):{seq:number;ability:ClassAbility;target?:string}|null{
+    if(!raw||typeof raw!=="object")return null;
+    const packet=raw as Record<string,unknown>;
+    if(packet.type!=="ability"||typeof packet.seq!=="number"||!Number.isSafeInteger(packet.seq)||packet.seq<0)return null;
+    if(!isClassAbility(packet.ability))return null;
+    if(packet.target!==undefined&&(typeof packet.target!=="string"||!/^[\w-]{1,64}$/.test(packet.target)))return null;
+    return {seq:packet.seq,ability:packet.ability,...(typeof packet.target==="string"?{target:packet.target}:{})};
+  }
+  private veiled(id:string):boolean{
+    const vital=this.players.get(id);
+    return !!vital&&this.time<vital.veilUntil;
+  }
+  private incomingBite(vital:CombatPlayer):number{
+    if(this.time<vital.bulwarkUntil)return Math.ceil(BITE_DAMAGE/2);
+    const reduction=ABILITY_SPECS["aether-ward"].biteReduction??0;
+    if(this.time<vital.wardUntil)return Math.max(1,BITE_DAMAGE-reduction);
+    return BITE_DAMAGE;
+  }
+  private wolfRangeError(actor:{x:number;z:number},maxRange:number):string|null{
+    if(this.wolf.phase==="dead")return "wolf defeated";
+    if(range(actor,this.wolf)>maxRange)return "target out of range";
+    return null;
+  }
+  private shadeStep(actor:SimPlayer,stopDistance:number,commit:boolean):{x:number;z:number}{
+    const dist=range(actor,this.wolf);
+    let x=actor.x,z=actor.z;
+    if(dist>stopDistance&&dist>0.001){
+      const travel=dist-stopDistance;
+      const next=moveWithCollision(actor.x,actor.z,(this.wolf.x-actor.x)/dist*travel,(this.wolf.z-actor.z)/dist*travel);
+      x=next.x;z=next.z;
+    }
+    if(commit){
+      actor.x=x;actor.z=z;
+      actor.heading=Math.atan2(this.wolf.x-x,this.wolf.z-z);
+    }
+    return {x,z};
+  }
+  private supportTarget(casterId:string,actor:SimPlayer,requested:string|undefined,maxRange:number,requireInjured:boolean):{id:string}|{error:string}{
+    if(requested!==undefined){
+      const other=this.world.players.get(requested);
+      const vital=this.players.get(requested);
+      if(!other||!vital)return {error:"target unavailable"};
+      if(!vital.alive)return {error:"target defeated"};
+      if(requested!==casterId&&range(actor,other)>maxRange)return {error:"target out of range"};
+      if(requireInjured&&vital.health>=vital.maxHealth)return {error:"no one needs mending"};
+      return {id:requested};
+    }
+    let best:{id:string;health:number;dist:number;self:boolean}|null=null;
+    for(const other of this.world.players.values()){
+      const vital=this.players.get(other.id);
+      if(!vital?.alive||vital.health>=vital.maxHealth)continue;
+      const dist=other.id===casterId?0:range(actor,other);
+      if(dist>maxRange)continue;
+      const self=other.id===casterId;
+      if(!best||vital.health<best.health||(vital.health===best.health&&self!==best.self&&!self)||(vital.health===best.health&&self===best.self&&dist<best.dist))
+        best={id:other.id,health:vital.health,dist,self};
+    }
+    if(best)return {id:best.id};
+    if(!requireInjured)return {id:casterId};
+    return {error:"no one needs mending"};
+  }
+  private planAbility(id:string,actor:SimPlayer,spec:AbilitySpec,target?:string):{error:string}|{damage?:number;healId?:string;wardId?:string;barrier?:boolean;veil?:boolean;dash?:boolean;breakVeil?:boolean;scout?:AbilityScout}{
+    switch(spec.kind){
+      case "barrier":return {barrier:true};
+      case "bolt":
+      case "area":
+      case "strike":{
+        const blocked=this.wolfRangeError(actor,spec.range??0);
+        if(blocked)return {error:blocked};
+        if(!spec.damage)return {error:"ability unavailable to this class"};
+        return {damage:spec.damage,breakVeil:true};
+      }
+      case "dash":{
+        const blocked=this.wolfRangeError(actor,spec.range??0);
+        if(blocked)return {error:blocked};
+        const landing=this.shadeStep(actor,spec.stopDistance??ATTACK_RANGE,false);
+        if(range(landing,this.wolf)>ATTACK_RANGE)return {error:"path blocked"};
+        if(!spec.damage)return {error:"ability unavailable to this class"};
+        return {dash:true,damage:spec.damage,breakVeil:true};
+      }
+      case "heal":{
+        const picked=this.supportTarget(id,actor,target,spec.range??0,true);
+        if("error" in picked)return picked;
+        return {healId:picked.id};
+      }
+      case "ward":{
+        const picked=this.supportTarget(id,actor,target,spec.range??0,false);
+        if("error" in picked)return picked;
+        return {wardId:picked.id};
+      }
+      case "stealth":return {veil:true};
+      case "scout":return {scout:this.scoutPulse(id,actor,spec)};
+      default:{
+        const unexpected:never=spec.kind;
+        throw new Error("Unhandled ability kind "+unexpected);
+      }
+    }
+  }
+  private scoutPulse(id:string,actor:SimPlayer,spec:AbilitySpec):AbilityScout{
+    const wolfDist=range(actor,this.wolf);
+    const wolfSeen=this.wolf.phase!=="dead"&&wolfDist<=(spec.range??0);
+    let allies=0;
+    const allyRange=spec.allyRange??0;
+    for(const other of this.world.players.values()){
+      if(other.id===id)continue;
+      const vital=this.players.get(other.id);
+      if(vital?.alive&&range(actor,other)<=allyRange)allies++;
+    }
+    return {
+      wolf:wolfSeen?{x:this.wolf.x,z:this.wolf.z,distance:Math.round(wolfDist*10)/10}:null,
+      allies
+    };
   }
   tick(dt=TICK_SECONDS):void{
     const seconds=Math.max(0,Math.min(TICK_SECONDS,dt));
@@ -185,24 +321,27 @@ export class CombatSimulation {
     let closest:SimPlayer|null=null;
     for(const actor of this.world.players.values()){
       const vital=this.players.get(actor.id);
-      if(!vital?.alive)continue;
+      if(!vital?.alive||this.veiled(actor.id))continue;
       if(Math.hypot(actor.x-5,actor.z-5)>18)continue;
       if(range(actor,w)>7)continue;
       if(!closest||range(actor,w)<range(closest,w))closest=actor;
     }
     if(w.phase==="windup"){
-      if(this.time<w.windupUntil)return;
-      const target=w.targetId?this.world.players.get(w.targetId):undefined;
-      const targetVital=w.targetId?this.players.get(w.targetId):undefined;
-      if(target&&targetVital?.alive&&range(target,w)<3&&this.time>=targetVital.dodgeUntil){
-        targetVital.health=Math.max(0,targetVital.health-(this.time<targetVital.bulwarkUntil?Math.ceil(BITE_DAMAGE/2):BITE_DAMAGE));
-        if(targetVital.health===0){
-          targetVital.alive=false;targetVital.respawnAt=this.time+5;
-          target.dx=0;target.dz=0;
+      if(w.targetId&&this.veiled(w.targetId)){w.phase="idle";w.targetId=null;w.windupUntil=0;}
+      else if(this.time<w.windupUntil)return;
+      else{
+        const target=w.targetId?this.world.players.get(w.targetId):undefined;
+        const targetVital=w.targetId?this.players.get(w.targetId):undefined;
+        if(target&&targetVital?.alive&&range(target,w)<3&&this.time>=targetVital.dodgeUntil){
+          targetVital.health=Math.max(0,targetVital.health-this.incomingBite(targetVital));
+          if(targetVital.health===0){
+            targetVital.alive=false;targetVital.respawnAt=this.time+5;
+            target.dx=0;target.dz=0;
+          }
         }
+        w.phase="strike";w.nextAttackAt=this.time+1.5;
+        return;
       }
-      w.phase="strike";w.nextAttackAt=this.time+1.5;
-      return;
     }
     if(!closest){w.phase="idle";w.targetId=null;return;}
     w.targetId=closest.id;

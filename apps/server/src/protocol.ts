@@ -1,6 +1,7 @@
-/** Wire format v1. Do not treat client messages as authoritative positions. */
+/** Wire format. Do not treat client messages as authoritative positions, damage, or healing. */
 import type {CharacterIdentity} from "../../shared/src/characterCatalog";
-export const PROTOCOL_VERSION=11;
+import type {ClassAbility} from "../../shared/src/classAbilities";
+export const PROTOCOL_VERSION=12 as const;
 export const MOVEMENT_SPEED=5.5;
 export const WORLD_HALF_EXTENT=8192;
 export const AOI_RADIUS=160;
@@ -9,9 +10,9 @@ export const SNAPSHOT_HZ=10;
 export interface InputMessage {type:"input";seq:number;dx:number;dz:number}
 export interface HelloMessage {type:"hello";token?:string;accountToken?:string;mode?:"account"|"guest";name?:string}
 export type CombatActionMessage={type:"action";seq:number;action:"attack"|"dodge";target?:string};
-export type ClientMessage=InputMessage|HelloMessage|{type:"account_register"|"account_login";username:string;password:string}|{type:"ability";seq:number;ability:"bulwark"|"arc-bolt"|"quickstrike"}|{type:"create_character";name:string;faction:CharacterIdentity["faction"];race:CharacterIdentity["race"];characterClass:CharacterIdentity["characterClass"]}|CombatActionMessage|{type:"inventory"}|{type:"progression"}|{type:"equip";item:"starter-sword"|"fangblade"|"ironblade"}|{type:"use";item:"healing-tonic"}|{type:"gather"}|{type:"craft";recipe:"ironblade"|"healing-tonic"}|{type:"quest";action:"status"|"accept"|"turnin";id?:"verdant-wolf-hunt"};
+export type ClientMessage=InputMessage|HelloMessage|{type:"account_register"|"account_login";username:string;password:string}|{type:"ability";seq:number;ability:ClassAbility;target?:string}|{type:"create_character";name:string;faction:CharacterIdentity["faction"];race:CharacterIdentity["race"];characterClass:CharacterIdentity["characterClass"]}|CombatActionMessage|{type:"inventory"}|{type:"progression"}|{type:"equip";item:"starter-sword"|"fangblade"|"ironblade"}|{type:"use";item:"healing-tonic"}|{type:"gather"}|{type:"craft";recipe:"ironblade"|"healing-tonic"}|{type:"quest";action:"status"|"accept"|"turnin";id?:"verdant-wolf-hunt"};
 export interface PlayerState {id:string;name:string;x:number;z:number;heading:number;character?:CharacterIdentity}
-export interface WelcomeMessage {type:"welcome";protocol:11;id:string;token:string;player:PlayerState;character:CharacterIdentity}
+export interface WelcomeMessage {type:"welcome";protocol:typeof PROTOCOL_VERSION;id:string;token:string;player:PlayerState;character:CharacterIdentity}
 export interface CombatVital {health:number;stamina:number;maxHealth:number;maxStamina:number;alive:boolean}
 export interface CombatWolf {id:string;x:number;z:number;heading:number;health:number;maxHealth:number;phase:"idle"|"chase"|"windup"|"strike"|"dead";windupUntil:number}
 export interface SnapshotMessage {type:"snapshot";tick:number;you:PlayerState;others:PlayerState[];ack:number;vitals:CombatVital;wolf:CombatWolf|null}
@@ -28,7 +29,8 @@ export interface ResourceResultMessage{type:"resource_result";action:"gather"|"c
 export interface UseResultMessage{type:"use_result";ok:boolean;reason?:string;item?:string;health?:number}
 export type CreationRequiredMessage={type:"creation_required"};
 export type CreationResultMessage={type:"creation_result";ok:false;reason:string};
-export interface ClassAbilityResult{type:"ability_result";seq:number;ability:"bulwark"|"arc-bolt"|"quickstrike";ok:boolean;reason?:string;wolfHealth:number;health:number;stamina:number;cooldownSeconds:number}
+export interface AbilityScout{wolf:{x:number;z:number;distance:number}|null;allies:number}
+export interface ClassAbilityResult{type:"ability_result";seq:number;ability:ClassAbility;ok:boolean;reason?:string;wolfHealth:number;health:number;stamina:number;cooldownSeconds:number;healedId?:string;healedHealth?:number;subjectId?:string;subjectSelf?:boolean;position?:{x:number;z:number};scout?:AbilityScout}
 export type ServerMessage={type:"auth_required"}|{type:"auth_result";ok:false;reason:string}|{type:"account_ready";token:string;hasCharacter:boolean}|ClassAbilityResult|CreationRequiredMessage|CreationResultMessage|WelcomeMessage|SnapshotMessage|CombatActionResult|InventoryMessage|RewardMessage|QuestStatusMessage|QuestResultMessage|ProgressionMessage|EquipResult|ResourceResultMessage|UseResultMessage|{type:"error";message:string};
 export function validateInput(input:unknown):InputMessage|null{
   if(!input||typeof input!=="object")return null;

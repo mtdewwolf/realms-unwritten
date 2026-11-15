@@ -15,8 +15,8 @@ export const RACES={
 } as const;
 export const CLASSES={
   vanguard:{name:"Vanguard",role:"Frontline",description:"Armored melee fighter and protector."},
-  spellweaver:{name:"Spellweaver",role:"Magic",description:"Channeler of elemental and arcane power."},
-  shadeblade:{name:"Shadeblade",role:"Skirmisher",description:"Quick, precise ambusher and scout."}
+  spellweaver:{name:"Spellweaver",role:"Magic",description:"Ranged bolts, an area burst, and mending or warding for allies."},
+  shadeblade:{name:"Shadeblade",role:"Skirmisher",description:"Melee strikes, a closing dash, stealth, and scouting."}
 } as const;
 export type FactionId=keyof typeof FACTIONS;
 export type RaceId=keyof typeof RACES;
