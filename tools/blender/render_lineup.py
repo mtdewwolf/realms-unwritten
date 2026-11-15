@@ -57,9 +57,9 @@ def render(faction,characters,assets,out):
   # Four silhouette platforms make each race and its height readable.
   bpy.ops.mesh.primitive_cylinder_add(vertices=20,radius=1.3,depth=.17,location=((i-1.5)*3.05,0,-.01))
   base=bpy.context.object;base.name="Plinth_"+race;base.data.materials.append(gold)
- light("Key",(-5,-8,10),1800,(1.0,.85,.64),9)
- light("Fill",(5,-6,7),900,(.65,.82,1.0),8)
- light("Rim",(0,5,9),2200,(.95,.7,.85) if not good else (.75,1.0,.89),8)
+ light("Key",(-5,-8,10),850,(1.0,.85,.64),9)
+ light("Fill",(5,-6,7),440,(.65,.82,1.0),8)
+ light("Rim",(0,5,9),1100,(.95,.7,.85) if not good else (.75,1.0,.89),8)
  bpy.ops.object.camera_add(location=(0,-19,5.3))
  camera=bpy.context.object
  direction=Vector((0,0,1.75))-camera.location
@@ -67,7 +67,7 @@ def render(faction,characters,assets,out):
  camera.data.type="ORTHO";camera.data.ortho_scale=15.6
  bpy.context.scene.camera=camera
  scene=bpy.context.scene
- scene.render.engine="CYCLES";scene.cycles.samples=12
+ scene.render.engine="CYCLES";scene.cycles.samples=32
  # Ubuntu's Blender is compiled without OpenImageDenoiser. The lighting and geometry
  # can still be rendered correctly using un-denoised CPU cycles samples.
  if hasattr(scene.cycles,"use_denoising"):scene.cycles.use_denoising=False
