@@ -1,871 +1,396 @@
-# ⚔️ Realms Unwritten
+# Realms Unwritten
 
-**Android-first fantasy MMORPG project — currently a playable 3D exploration and small-scale multiplayer prototype.**
-> **Design reference:** We use **World of Warcraft 1.12.1 (vanilla-era)** as the primary benchmark for world structure, faction/race/class design, questing, combat, professions, economy and social systems. All game content remains original. See [MMORPG Reference Standard](docs/WOW_1121_REFERENCE_STANDARD.md).
+Realms Unwritten is a playable prototype of an original, Android-first fantasy world. You create an account, enter as one of eight races, explore a generated landscape, fight a shared wolf, gather, craft, and see other players on the same realm server.
 
+The long-term reference for structure is vanilla-era World of Warcraft (1.12.1): world scale, factions, quests, combat, and professions. The factions, races, names, and art in this repository are original. See [MMORPG reference standard](docs/WOW_1121_REFERENCE_STANDARD.md).
 
-Built with **Bun + TypeScript + Three.js + Vite + Capacitor**, using Blender to generate original rigged GLB character prototypes. Windows/desktop web play is supported for development and testing; Android is the priority platform.
-
-> **Reality check:** This repository contains an original evolving prototype, **not a finished MMORPG**. World generation, local wolf combat, exploration, map, and a single-process authoritative **movement** server are implemented. Quests, inventory, crafting, economy, accounts, production-ready combat, NPC ecosystems, and MMO-scale operation are **not implemented**. **A single shared server-authoritative wolf combat vertical slice is now implemented**; it has no rewards and does not represent a completed combat system. Older "0.6" multiplayer gameplay source referenced in earlier planning has **not** been imported into this repository. See [Current status](#current-feature-matrix) and [Outstanding work](#outstanding-work).
+Today’s build is one Bun process and one SQLite file: accounts, one shared wolf, one quest, and the players connected to that process. Chat, parties, guilds, merchants, and extra quests are still ahead of this tree.
 
 ## Contents
 
-1. [Current feature matrix](#current-feature-matrix)
-2. [Game vision and gameplay](#game-vision-and-gameplay)
-3. [World generation, geography, and streaming](#world-generation-geography-and-streaming)
-4. [Characters, controls, combat, and animation](#characters-controls-combat-and-animation)
-5. [Exploration, discoveries, settlements, and atlas](#exploration-discoveries-settlements-and-atlas)
-6. [Multiplayer architecture and persistence](#multiplayer-architecture-and-persistence)
-7. [Technology and repository layout](#technology-and-repository-layout)
-8. [Prerequisites and local setup](#prerequisites-and-local-setup) ([Railway](#railway))
-9. [Building Android APKs](#building-android-apks)
-10. [Blender asset pipeline](#blender-asset-pipeline)
-11. [All automated and manual testing steps](#all-automated-and-manual-testing-steps)
-12. [Known limitations, security, and troubleshooting](#known-limitations-security-and-troubleshooting)
-13. [Outstanding work and milestones](#outstanding-work-and-milestones)
-14. [Supporting design documents](#supporting-design-documents)
+1. [Feature overview](#feature-overview)
+2. [Repository layout](#repository-layout)
+3. [Prerequisites](#prerequisites)
+4. [Quick start](#quick-start)
+5. [Configuration](#configuration)
+6. [Deploy the realm server on Railway](#deploy-the-realm-server-on-railway)
+7. [Android app](#android-app)
+8. [Art pipeline](#art-pipeline)
+9. [Testing and CI](#testing-and-ci)
+10. [Further reading](#further-reading)
 
-## Current feature matrix
+## Feature overview
 
-Status meanings: **Implemented** = present in source and exercised by automated tests or CI; **Prototype** = runnable initial functionality without full game/business logic; **Planned** = absent or incomplete.
+The client is a Three.js scene in a Vite app, wrapped for Android with Capacitor. The realm server in `apps/server` owns accounts, positions, the wolf, inventory, quests, gathering, and crafting. The wire protocol is **version 11** (`PROTOCOL_VERSION` in `apps/server/src/protocol.ts`). Client and server have to be from the same protocol generation.
 
-| Area | Status | What actually exists |
+| Area | What the current code does |
+| --- | --- |
+| Accounts | Register and sign in over the WebSocket. Passwords are Argon2id hashes. A session lasts 30 days. Each account owns one character. |
+| Characters | Two factions, eight races, three classes, plus a saved appearance. |
+| Inventory | Server-owned stacks, coins, and one equipped weapon. The Backpack panel shows them. |
+| Quests | One quest, Wolf Hunt, offered by the Verdant Reach guard. |
+| Gathering | Iron ore and Moonleaf, taken from the server position, with shared node cooldowns in SQLite. |
+| Crafting | Ironblade and Healing Tonic, only beside that guard. |
+| Combat | One shared starter wolf. Attack, dodge, and three class abilities are server-checked. |
+| Movement | The server simulates at 20 Hz and snapshots at 10 Hz. The client predicts with the same movement step. |
+| World | A 16,384 m square streamed in 64 m chunks. Discoveries and the atlas stay on the device. |
+
+### Accounts
+
+The title screen talks to `ws://` or `wss://` at the path `/ws`.
+
+- **Create account** and **Sign in** send `account_register` or `account_login`. A username is 3–24 characters, starts with a letter, and may contain letters, digits, `_`, and `-`. The server stores it in lowercase. A password is 10–128 characters. Hashing uses Argon2id (`memoryCost` 16384, `timeCost` 3) through `Bun.password`.
+- A successful auth returns an `account_ready` bearer token. The client keeps it in `localStorage` under `realms-unwritten-account-session-v1`. The database stores only the SHA-256 of that token. Sessions expire after 30 days (`ACCOUNT_SESSION_DURATION_MS`).
+- An account with no character receives `creation_required`. An account that already has one enters that character. A second character on the same account is rejected.
+- **Continue legacy guest** still resumes a pre-account bearer token (`realms-unwritten-guest-token-v1`). **Offline demo** never creates an account, and nothing from that session is saved on the server.
+- There is no email recovery, password reset, or account deletion. A socket may attempt auth five times.
+
+### Characters and races
+
+Creation sends `create_character` with a name, faction, race, and class. A name is 3–20 characters after trimming, starts with a letter or number, and may include letters, numbers, spaces, apostrophes, and hyphens. The race has to belong to the faction. Optional appearance is body frame (`lean` or `sturdy`), skin tone, hair style, hair color, and marking. Identity is stored in SQLite and comes back on `welcome`.
+
+| The Radiant Accord | The Umbral Dominion |
+| --- | --- |
+| Sunborne, Thornkin, Stonehearth, Aetheri | Ashforged, Hornwarden, Hollowborn, Veilkin |
+
+Classes are **Vanguard**, **Spellweaver**, and **Shadeblade**. Each pair is a rigged model, `hero-<race>-<class>.glb`, with clips `idle`, `walk`, `attack`, `dodge`, `cast`, and `death`. The creator shows a tap-selectable lineup of the four races in the chosen faction. If a GLB is missing, the procedural race mesh stays visible.
+
+Class abilities are checked on the server against the saved class:
+
+| Class | Ability | Server rule |
 | --- | --- | --- |
-| Android build pipeline | **Implemented** | CI-generated debug APK via Capacitor/Gradle; no store release |
-| Bun/TypeScript monorepo | **Implemented** | Client and server workspaces, type checking, Bun tests |
-| 3D rendering | **Implemented** | Three.js scene, lights, fog, zoomable orbit view, ground and props |
-| Mobile and keyboard input | **Prototype** | Virtual joystick, WASD, camera drag/pinch, actions, focus reset |
-| Addressable world | **Implemented** | 16,384 × 16,384-meter square; 256 × 256 logical chunks |
-| World streaming | **Implemented** | 64-meter chunks; radius 2 (~25 loaded terrain chunks inland) |
-| Heightfield and biomes | **Prototype** | Deterministic terrain elevation; meadow, woodland, highlands |
-| Terrain-aware player/prop elevation | **Prototype** | Triangle-interpolated ground height; no physics-based collision |
-| Original characters | **Prototype** | Blender-generated adventurer and wolf GLBs, rigged animation clips |
-| Combat | **Prototype (online authoritative starter wolf + offline local demo)** | Bun owns one shared wolf, attacks, cooldowns, health/stamina, telegraphs, death and respawn; no XP/loot |
-| Landmarks and resource imagery | **Prototype** | Ruins, ore outcrops, dens; no functional mining or harvesting |
-| Roads | **Prototype** | Rectangular 512-meter-spaced road corridors, generated with chunks |
-| Settlements | **Prototype** | Starter village plus deterministic hamlets/outposts and beacons |
-| Atlas and fog of war | **Prototype** | 1.024-km local map, explored 64-meter cells, discovered markers, waypoints |
-| Discovery storage | **Prototype (device only)** | localStorage records for visited map cells, landmarks, settlements |
-| Bun networking | **Implemented vertical slice** | WebSocket handshake, guest join, input, snapshots |
-| Authoritative movement | **Implemented vertical slice** | Server controls positions at 20 Hz; sends snapshots at 10 Hz |
-| Nearby player visibility | **Prototype** | 160-meter interest radius, simplified other-player models |
-| Character position persistence | **Prototype** | Bun SQLite guest tokens and position records |
-| Real accounts / characters | **Planned** | No login, recovery, selection, multiple slots |
-| Persistent shared world | **Planned** | No authoritative world mutation/structure ownership |
-| Server-authoritative combat/AI | **Prototype** | One synchronized Bun wolf encounter; no broader AI/spawn/loot system |
-| Inventory, equipment, loot | **Prototype** | Worn Sword/Fangblade equipment, server-owned damage bonuses, wolf materials and coins |
-| Skills, XP, leveling, classes | **Prototype** | Server-owned XP, levels, derived attributes, Android HERO panel; no classes or skills |
-| Gathering, crafting, economy | **Prototype** | Bun validates ore gathering, shared cooldown and Ironblade recipe; no wider economy |
-| NPC dialogue, quests, merchants | **Prototype** | Verdant Reach guard offers one persistent Wolf Hunt quest; no dialogue trees or merchants |
-| Chat, party, guilds, dungeons | **Planned** | No social or cooperative gameplay |
-| Production hosting and scale | **Prototype** | One Railway Bun service and a `/data` volume; no sharding, autoscaling, or load-test results |
+| Vanguard | Bulwark | 22 stamina. For 4 seconds, the wolf bite of 12 is reduced to 6. Cooldown 14 seconds. |
+| Spellweaver | Arc Bolt | 30 stamina, 28 damage, up to 9 meters. Cooldown 9 seconds. |
+| Shadeblade | Quickstrike | 25 stamina, 34 damage, within 3.25 meters. Cooldown 7 seconds. |
 
-**Last audited baseline:** branch `Master`, commit `0c24d4e` (November 2026). [Android / WebSocket smoke CI — passed](https://github.com/mtdewwolf/realms-unwritten/actions/runs/43148146024). This confirms a successful automated build and live two-client smoke test on a GitHub runner; **it is not evidence of real-device Android performance or production service reliability**.
+### Inventory, quests, gathering, and crafting
 
-## Game vision and gameplay
+A wolf kill grants each damage contributor one Wolf Pelt, one Wolf Fang, 5 coins, and 15 XP, in one SQLite transaction per contributor. Duplicate event ids do not pay twice.
 
-The long-term goal is a large shared fantasy world where players explore distinct regions, discover settlements and ancient locations, fight creatures, gather resources, craft equipment, progress their characters, trade, and participate in a persistent multiplayer economy. Current code demonstrates a **small fraction** of that loop:
+**Wolf Hunt** (`verdant-wolf-hunt`) is accepted and turned in within 6 meters of the guard at (2, −3). It takes 3 shared-wolf kills. Turn-in pays 25 coins, a Fangblade, and 75 XP. The Quests panel shows stage and kill count.
 
-1. Start near the Verdant Reach village.
-2. Move through generated hills, forests and open terrain.
-3. Discover ruins, ore outcrops, dens and named settlements.
-4. Open the world atlas to review explored cells; set a directional waypoint.
-5. Fight the **server-owned shared starter wolf when online**, or a local wolf demonstration when offline.
-6. Optionally connect to a Bun game server to see nearby guest players and synchronize movement.
+Gathering uses the authoritative position. Within 5 meters, the nearer of an iron outcrop or a Moonleaf patch is harvested. An exact tie harvests the ore. Ore nodes cool down for 30 seconds and Moonleaf for 45 seconds. Those cooldowns are global and survive a restart. A gather while dead, or while out of range, is rejected. A gather packet has no position field; the server uses the simulated character.
 
-The server now shares **one starter wolf encounter**, including its movement, health, bite windup and respawn. It does **not** share loot, discoveries, economy, quests or other world state. Do not assume that actions taken in an offline session are merged into an online account.
+Crafting uses the same 6-meter guard radius, which the server treats as the Verdant Reach workshop:
 
-### Platforms
-
-- **Primary:** Android debug APK using Capacitor's WebView.
-- **Development:** modern desktop web browser, Three.js and Vite.
-- **Windows native executable:** not implemented; Windows users can use the web development build.
-- **iOS/store distribution:** not configured.
-
-## World generation, geography, and streaming
-
-| Property | Current implementation |
-| --- | --- |
-| Logical world dimensions | **16,384 m × 16,384 m** (~268.4 km² addressable area) |
-| Logical chunk grid | 256 × 256 = 65,536 possible chunk addresses |
-| Chunk footprint | 64 × 64 meters |
-| Render radius | 2 chunks in each direction: nominally 5 × 5 = 25 active chunks, fewer at world edges |
-| Terrain grid | 17 × 17 vertices/chunk, 4-meter spacing, 512 triangles/chunk |
-| Terrain height | Smooth deterministic value noise sampled in global coordinates |
-| Starter village | Flat center with a gradual transition to the terrain heightfield |
-| Biomes | Meadow, woodland, highlands; simple color/foliage variations |
-| Placement | Seeded procedural trees/rocks and location blockouts |
-| Ground samples | `groundHeightAt()` interpolates the same terrain triangles the renderer uses |
-| Distant detail | Scene fog and limited chunk window; no finished terrain LOD system |
-
-**How streaming works:** `ChunkedWorld` calculates the player's chunk from world coordinates, instantiates nearby chunks, evicts distant ones, and disposes per-chunk terrain and landmark geometry. Shared materials and standard geometries are reused. Generation is deterministic: returning to the same location recreates the same baseline terrain and objects.
-
-**What "16 km world" does NOT mean:** it is not 268 km² of hand-authored content. There are no rivers, cliffs, bridges, terrain deformation, reliable prop collisions, weather, mounts or fast-travel networks yet. Terrain generation is client-side; an MMO will need versioned shared world seeds, persistent world deltas, and server-controlled interactions.
-
-Source: `apps/client/src/world/chunkedWorld.ts`, `terrain.ts`, `frontierProps.ts`.
-
-## Characters, controls, combat, and animation
-
-### Controls
-
-| Action | Desktop | Android / touch |
+| Recipe | Materials | Result |
 | --- | --- | --- |
-| Move | W / A / S / D | Lower-left virtual joystick |
-| Rotate camera | Drag on game canvas | One-finger drag over terrain |
-| Zoom camera | Mouse wheel | Two-finger pinch |
-| Open/close atlas | M | MAP button |
-| Close atlas | Escape | Map close button |
-| Attack wolf | ATTACK on-screen button | ATTACK button |
-| Dodge | DODGE button | DODGE button |
-| Gather | GATHER button | GATHER button; **not functional yet** |
-| Connect/disconnect multiplayer | Server URL + CONNECT/OFFLINE buttons | Same on-screen panel |
+| `ironblade` | 2 Iron Ore and 1 Wolf Fang | Ironblade, +12 weapon damage |
+| `healing-tonic` | 2 Moonleaf | Healing Tonic |
 
-Joystick/camera pointers are reset when the window loses focus or the document is hidden. Camera zoom distance is clamped to approximately 11–30 world units.
+Using a Healing Tonic consumes one tonic and restores 30 health, only for a living character who is below 100 health. The server ignores any heal amount on the packet.
 
-### Local combat demo
+Weapons are Worn Sword (+0), Fangblade (+8), and Ironblade (+12). A sword hit is `20 + floor((Strength − 5) / 2) + weapon bonus`. Strength is `5 + (level − 1) * 2`. Vitality and Agility are shown on the Character panel. Reaching level 2 takes 100 XP. The threshold for a level is `50 * (level − 1) * level`, and levels cap at 50.
 
-- One wolf near the start, initially 60 HP.
-- Sword attacks cost **16 stamina**, deal **20 damage** if within a 3.25-meter attack range, and use a ~0.65-second attack interval.
-- Dodges cost **26 stamina**, provide a short evasion window and a 2.25-meter displacement.
-- Stamina cap **100**, regeneration **18/sec**.
-- Wolf bite telegraph ~**0.85 sec**, bite damage **12**, cooldown approximately **1.5 sec**.
-- Player has **100 HP** in the encounter; UI shows player/wolf health, stamina and combat messages.
-- A defeated wolf is removed/hidden in the local demo; respawn and loot are not implemented.
-- **When connected, wolf attacks, enemy health/movement, cooldowns and player health/stamina are server-owned.** Offline mode retains the local demo. No rewards, server-side physics collision or production-grade combat security exist yet.
+Player health and stamina (both cap at 100) reset when you rejoin. Inventory, coins, gear, quest progress, XP, and x/z position persist. Stamina regenerates at 18 per second while alive. The wolf has 60 health and respawns 8 seconds after defeat. A downed player respawns after 5 seconds at (0, 0).
 
-### Character art
+### Multiplayer
 
-`tools/blender/generate_characters.py` builds **original low-poly prototype** adventurer and wolf GLBs using Blender's Python API. Required animation clips:
-
-| Character | Clips |
-| --- | --- |
-| Adventurer | `idle`, `walk`, `attack`, `dodge` |
-| Wolf | `idle`, `walk`, `attack`, `death` |
-
-The client loads `/assets/adventurer.glb` and `/assets/wolf.glb` with `GLTFLoader` and animates them using `AnimationMixer`. If an asset is missing or invalid, the existing procedural character is retained as a fallback. Remote multiplayer players are currently simpler procedural avatars, not the full rigged animated GLB.
-
-**Not production-ready:** mesh/UV quality, skeleton standards, animation transitions, weapon attachment, equipment swapping, damage reactions, LOD and actual Android GPU profiling.
-
-## Exploration, discoveries, settlements, and atlas
-
-### Landmark types
-
-- **Forgotten Watchtower:** visual ruin / stone-beacon point of interest.
-- **Ironstone Outcrop:** visible ore formation; no gathering economy yet.
-- **Wolf Territory:** den geometry; no server-managed spawn territory yet.
-
-Landmark IDs and positions are deterministic, based on 256-meter world regions and biome rules; they are instantiated only in their owning terrain chunk. Discovering a landmark occurs near it, within about 16 meters. The map and status UI show discovery feedback.
-
-### Settlements and roads
-
-- **Verdant Reach** is the starting village.
-- Deterministic additional **hamlets and outposts** appear at a subset of road-grid intersections.
-- Roads form a 512-meter-spaced orthogonal network and follow local height samples.
-- Additional settlements contain basic cottages and a beacon. There are no actual NPCs, shop inventories, quests or services.
-- Settlement discovery proximity is about 28 meters; discovered towns can appear in the atlas.
-
-### Atlas and navigation
-
-- MAP button or **M** toggles the atlas.
-- North-up local view, approximately 1.024 km across.
-- Fog-of-war cells are 64 × 64 meters.
-- Discovered landmarks and settlements appear as markers.
-- Tapping **explored terrain** sets a waypoint; selecting a nearby **discovered landmark** marker can snap the waypoint to that location.
-- Distance and compass bearing are shown on the HUD; coming within ~8 meters clears the waypoint.
-- **No route/pathfinding:** the bearing points toward the destination directly, and does not avoid hills, buildings or obstacles.
-- Current map is centered on the player; there is no whole-world atlas, zoom control or shared party exploration.
-
-### Device-local storage
-
-Currently stored in browser/WebView `localStorage`:
-
-| Key | Purpose |
-| --- | --- |
-| `realms-unwritten-map-v1` | Explored 64-meter cells |
-| `realms-unwritten-discoveries-v1` | Landmark discovery IDs |
-| `realms-unwritten-settlement-discoveries-v1` | Settlement discovery IDs |
-| `realms-unwritten-guest-token-v1` | Guest bearer token for Bun server reconnect |
-
-Data is **specific to that browser profile/device origin**, not synchronized across accounts. Clearing app data or browser storage can lose discoveries and the guest token. Do not treat localStorage as secure credential storage.
-
-## Multiplayer architecture and persistence
-
-### Topology
-
-```text
-Android Capacitor client / desktop browser
-     │
-     ├── Three.js terrain, map, local wolf encounter
-     │
-     └── WebSocket  ws://SERVER:3001/ws   (WSS required for public hosting)
-                  │
-                  ▼
-            Bun server (single process)
-              ├── Guest handshake and input validation
-              ├── Fixed 20 Hz authoritative movement tick
-              ├── 10 Hz nearby player snapshots
-              ├── Interest radius: 160 meters
-              └── SQLite guest characters / saved positions
-```
-
-Server entry point: `apps/server/src/index.ts`. Core movement: `simulation.ts`. Message validation: `protocol.ts`, with authoritative wolf combat in `combat.ts`. Client integration: `apps/client/src/multiplayer/client.ts`.
-
-### HTTP and WebSocket
-
-- `GET /health`: JSON with `ok`, `game`, protocol version and current online player count.
-- `GET /ws` with WebSocket upgrade: multiplayer connection.
-- Default port: **3001**; configurable via `PORT`.
-- Bind address: `0.0.0.0` by default; override via `HOST`.
-- Protocol version: **11** (client/server must use matching builds).
-- Clients send `hello` with an optional existing guest token and optional sanitized display name; server sends `welcome` with player ID, token, initial position.
-- Clients send numbered movement vectors, not positions; server clamps speed and world bounds.
-- Server returns `snapshot` containing own authoritative position, acknowledgment sequence and nearby players.
-- Basic per-WebSocket limit: 40 messages/second; maximum payload length 2,048 bytes. Input inactivity stops player motion after ~400 ms.
-- Nearby-player lookup currently scans all players per client (roughly quadratic), **not** production spatial indexing.
-
-Example messages (illustrative):
+`GET /health` returns JSON:
 
 ```json
-{"type":"hello","name":"Adventurer"}
+{"ok":true,"game":"realms-unwritten","protocol":11,"players":0,"wolfHealth":60}
 ```
 
-```json
-{"type":"input","seq":1,"dx":1,"dz":0}
-```
+`GET /ws` upgrades to a WebSocket. Any other path returns the text `Realms Unwritten authoritative movement prototype`.
 
-```json
-{"type":"snapshot","tick":42,"you":{"id":"...","name":"Adventurer","x":0,"z":0,"heading":0},"others":[],"ack":1}
-```
+Clients send an input vector and a rising sequence. Speed is 5.5. `moveWithCollision` clamps travel to ±8190 meters (`WORLD_MOVEMENT_LIMIT`), two meters inside the 8192-meter half-extent. Other players are included inside 160 meters. Simulation is 20 Hz and snapshots are 10 Hz. Server ticks and the client both use that collision step (`apps/client/src/world/collision.ts`). The local avatar predicts with the same step (`apps/client/src/multiplayer/prediction.ts`) so walking stays continuous between snapshots.
 
-### Online starter wolf encounter
+Each socket allows 40 messages per second and a 2,048-byte payload. The idle timeout is 90 seconds. If no input arrives for more than 400 ms, velocity is cleared. A new socket with the same character saves and detaches the previous socket (close code 4002). Transient drops retry up to 6 times. The delays are 500 ms, 1 s, 2 s, 4 s, 8 s, and 12 s. The hello and character-creation wait is 8 seconds.
 
-When connected to a protocol v2 server, **Bun owns the wolf and player combat vitals**. Clients send `action` packets with an increasing sequence and target ID; the server checks range, stamina, cooldown and health before updating a single shared wolf. Relevant nearby snapshots carry its position, state and remaining HP. The wolf respawns eight seconds after defeat; an incapacitated player respawns after five seconds. These are prototype rules, without loot or XP. See [Authoritative Combat](docs/AUTHORITATIVE_COMBAT.md).
+The addressable world is 16,384 m × 16,384 m, divided into 64 m chunks on a 256 × 256 grid. The client keeps a radius of 2 chunks (up to 25). Terrain, biomes, roads, settlements, and landmarks are generated on the client. Explored map cells, landmark discoveries, and settlement discoveries stay in `localStorage` (`realms-unwritten-map-v1`, `realms-unwritten-discoveries-v1`, `realms-unwritten-settlement-discoveries-v1`) and are not part of the account.
 
-### Server-owned wolf loot and inventory
+In the world, **☰ MENU** opens Map, Backpack, Quests, Character, and Multiplayer. **M** opens the map. The action button reads GATHER, MINE, or PICK depending on the nearest node.
 
-A successful shared wolf kill grants each online damage contributor one **Wolf Pelt**, one **Wolf Fang**, and **five coins**. Bun creates the grant and records a SQLite receipt, stack quantities, and wallet balance inside a transaction. The Android **BAG** shows server inventory after reconnect. Offline combat awards nothing; equipment, selling and crafting are not implemented. See [Inventory and Loot](docs/INVENTORY_LOOT.md).
-
-### Starter NPC and Wolf Hunt Quest
-
-The Verdant Reach guard at (2,-3) offers a one-time **Wolf Hunt** quest. Accept while within 6 meters of the guard, contribute successful damage to three separate shared starter-wolf defeats, and return to claim **25 coins**. Quest state and kill receipts live in SQLite; each character receives independent progress, and a repeated turn-in cannot duplicate coins. The Android QUEST panel shows the objective and current count. Online only; no XP, dialogue trees or quest chains. See [Wolf Hunt Quest](docs/WOLF_HUNT_QUEST.md).
-
-### Persistent character XP and levels
-
-The server awards **15 XP** for each qualified wolf kill and **75 XP** upon the one-time Wolf Hunt turn-in. Total XP and idempotent reward receipts are stored in SQLite. Level 2 requires 100 total XP; after three wolf kills and the quest payout, a character has 120 XP and reaches level 2. The Android **HERO** panel displays level, XP progress, Strength, Vitality and Agility. These attributes are **currently informational only**, not combat modifiers. See [Character Progression](docs/CHARACTER_PROGRESSION.md).
-
-### Starter equipment and authoritative combat scaling
-
-Characters begin with a default **Worn Sword (+0 weapon damage)**. Completing Wolf Hunt awards a **Fangblade (+8 weapon damage)** in the server inventory; the BAG panel can equip either weapon. Bun verifies ownership and persists the selected weapon in SQLite. Attacks against the shared starter wolf calculate damage as **20 base + floor((Strength - 5) / 2) + equipped weapon bonus**. Strength derives from server XP/level; damage supplied by clients is ignored. At level 2, a Fangblade hit deals 29 damage (20 + 1 + 8). Inventory, equipped gear, and XP survive a server restart. Vitality and Agility are not yet applied to combat. Protocol **v6**. See [Equipment and Combat Stats](docs/EQUIPMENT_COMBAT.md).
-
-### Authoritative gathering and first crafting recipe
-
-Ironstone Outcrops are deterministic world landmarks. Press **GATHER** within five meters of an ore landmark while online to receive **1 Iron Ore**. The server checks authoritative position, living status and each node's **30-second shared SQLite cooldown**; clients cannot submit alternate coordinates or mint their own ore. At the Verdant Reach guard/workshop, open BAG and craft an **Ironblade** from **2 Iron Ore + 1 Wolf Fang**. The recipe atomically deducts materials and creates an equippable **Ironblade (+12 damage)**. Offline gathering and crafting are not supported. Protocol v7. See [Gathering and Crafting](docs/GATHERING_CRAFTING.md).
-
-### Resource discovery and Android crafting guidance
-
-The Android client now shows the **nearest Ironstone Outcrop within 1.2 km** with distance and compass bearing. **TRACK ORE** places a navigation waypoint without revealing fog-of-war. Within 75 meters, the ore is highlighted by a cyan ground ring; within 5 meters the tracker prompts GATHER. Successful and depleted gather responses carry the server's remaining replenishment time, shown as a countdown hint. The BAG interface explains which ingredients are still missing for Ironblade and where to craft it. The server continues to check real ore node availability and recipe material counts; the client guidance is not authoritative. See [Resource Guidance](docs/RESOURCE_GUIDANCE.md).
-
-### Responsive Android game HUD and navigation
-
-The main game now uses a single **☰ MENU** to access MAP, BACKPACK, QUESTS, CHARACTER and MULTIPLAYER. This replaces multiple stacked corner buttons, keeps the joystick and combat controls available during exploration, and provides a responsive drawer with larger touch targets, safe-area padding and scrollable panels. The GATHER action highlights as **MINE** when an online player is within ore interaction range. The original game panels remain in use and share a single-navigation controller. See [Android Game Menu](docs/ANDROID_GAME_MENU.md).
-
-### Moonleaf Foraging and Healing Tonics
-
-Deterministic **Moonleaf** plants now appear in meadow and woodland regions and render as visible green crystal-leaf clusters. Server-validated GATHER/PICK yields one Moonleaf from a shared node with a **45-second persisted respawn cooldown**. At Verdant Reach, two Moonleaf craft one Healing Tonic in a single SQLite transaction; a server-validated USE consumes a tonic to restore up to **30 HP**, only if the player is alive and injured. Offline mode cannot craft or grant materials. The resource tracker now guides players to either ore or herbs. This is the second playable gathering loop; the larger economy and player health persistence are still outstanding. Protocol **v8**. See [Moonleaf and Tonics](docs/MOONLEAF_TONICS.md).
-
-### Authoritative house collision
-
-Bun now enforces **circle-versus-rectangle collisions** against the three Verdant Reach starter houses and generated settlement houses. The Android client uses the same deterministic resolver for offline walking and dash visualization. Diagonal movement slides along walls; movement uses substeps to avoid passing through narrow building footprints. Existing character positions inside houses are relocated safely upon login. This is a first building-collision milestone, not complete physical world collision: terrain props and cliffs remain non-blocking. See [Building Collision](docs/BUILDING_COLLISION.md).
-
-### Guest reconnect and session recovery
-
-Android now retries transient WebSocket disconnects with six bounded exponential attempts (500ms through 12s), an 8s join timeout, and automatic rejoin with the existing guest token. Explicit OFFLINE, incompatible protocol, and invalid credentials stop retries. Successful reconnection resets movement/action sequences, restores server position, and reloads inventory, quests and XP. Bun permits a valid guest token to take over its own older session: the previous session is saved/detached before replacement, preventing duplicate active characters. This protects against stale sockets after a brief network interruption, but is **not secure account authentication**; anyone possessing the guest bearer token can take over that character. See [Reconnection Architecture](docs/RECONNECTION.md).
-
-### Atomic wolf reward settlement
-
-Wolf kill loot, coins, quest progress and XP now commit together in one SQLite transaction per contributor, with rollback on failure and duplicate-event protection. See [Atomic Wolf Rewards](docs/ATOMIC_WOLF_REWARDS.md). This does not yet provide durable notification replay or transactional consumable health persistence.
-
-### Character creation: factions, races and classes
-
-New online guests now enter a character creator before the Bun server admits them to the world. Select **The Radiant Accord** (Sunborne or Thornkin) or **The Umbral Dominion** (Ashforged or Veilkin), then pick Vanguard, Spellweaver or Shadeblade and a name. Bun validates names and faction/race combinations and saves the immutable character identity in SQLite. Reconnect restores the same identity. Pre-existing guest characters are migrated automatically to the Sunborne Vanguard default without losing their token or progress. The Android HERO sheet displays lineage. Faction reputation, class abilities, PvP rules and distinct 3D race models are **not yet implemented**. Protocol v9. See [Character Creation](docs/CHARACTER_CREATION.md).
-
-### Race models, appearance and class abilities
-
-Each original race has a distinct procedural Three.js body silhouette with class gear (Vanguard shield and sword, Spellweaver staff, Shadeblade blades). Character creation includes a draggable live 3D preview and five validated choices: build, skin tone, hairstyle, hair color and markings. The selection is persisted with the immutable character identity in SQLite and restored on reconnect; existing identity records are migrated to default appearance. Nearby players show the appropriate race/class silhouette using server-sent identity snapshots.
-
-Three class-specific starter abilities are now server authoritative: **Vanguard Bulwark** halves wolf bite damage for four seconds (14s cooldown); **Spellweaver Arc Bolt** deals 28 damage at up to nine meters (9s cooldown); **Shadeblade Quickstrike** deals 34 melee damage (7s cooldown). Each costs stamina, validates class/range, and appears on the Android HUD with cooldown feedback. This is an initial class identity milestone, not the complete vanilla-style spellbook, talent or resource system. Protocol **v10**. See [Race Models and Class Abilities](docs/RACE_MODELS_AND_CLASSES.md).
-
-### Visual rebuild and account-first Android launch
-
-**The APK now opens to an original fantasy title screen rather than entering the world immediately.** A realm URL is required for online accounts. Register or sign in with a username and password (Argon2id hashed server-side), then create your race/class/appearance if the account has no character; returning accounts load their saved hero. Offline demo and legacy guest are deliberate separate choices. Account sessions persist for 30 days and character ownership is stored in SQLite. These are prototype accounts, not yet production-ready security: use WSS in deployment, implement server-side global rate limiting, recovery and account management before public release. Protocol **v11**.
-
-The starter graphical rebuild replaces cube houses with original layered-roof, timber-framed fantasy cottages, painted-style procedural slate/wood/stone/plaster textures, richer tree canopies, warmer lighting and distinct 3D race-creator stages. This is **visual rebuild pass 1**, not a complete WoW-quality asset set or a Warcraft asset port. See [Visual Rebuild & Entry Flow](docs/VISUAL_REBUILD_V1.md) for exactly what has and has not been built.
-
-### Graphical rebuild pass 2 — animated race models and faction environments
-
-The Android build now generates **12 original rigged GLBs** (four playable races × three starting classes) with idle, walk, attack, dodge, cast and death clips. The Three.js client uses a shared skeleton-safe animation loader for local heroes, nearby players and the creation preview, preserves selected body build, skin/hair colors, hairstyles and markings, and falls back to the existing procedural avatar if an asset fails to load. CI validates all 12 GLBs before packaging the APK.
-
-The visible world additionally contains **two different faction architectural enclaves** near Verdant Reach (Radiant Accord and Umbral Dominion), with corresponding server-authoritative house collisions. A mobile-oriented painted gradient sky, sunlight/fog cycle and character contact shadow bring atmosphere to the environment. These new assets supplement the existing painted cottages, ground, biome foliage and other environmental props.
-
-**Scope disclaimer:** This is a substantial graphical rebuild, not a complete production art overhaul. Authored high-fidelity faces, hair physics, complex clothing, large faction homelands, hand-authored dungeons, full UI/icon/audio art, and physical Android screenshot/FPS approval remain open. See [Graphical Rebuild Pass 2](docs/GRAPHICAL_REBUILD_PASS_2.md).
-
-### Eight-race playable lineup
-
-Four original races per faction now produce 24 race/class GLBs with contrasting bodies, facial features and armor silhouettes. The creator includes a tap-selectable 3D roster. Existing character data migrates safely. See [Lineup Overhaul](docs/RACE_LINEUP_OVERHAUL.md).
-
-### Guest persistence
-
-- SQLite via Bun's `bun:sqlite`.
-- Default DB file: `data/realms-world.sqlite`, **relative to the server process's working directory** (when started via the root `dev:server` script, this is `apps/server/data/realms-world.sqlite`).
-- Override with `WORLD_DB_PATH`, preferably an absolute path for deployment. On Railway this is `/data/realms-world.sqlite` on a volume mounted at `/data`. See [Railway](#railway).
-- Server stores **hashes** of guest bearer tokens, names, IDs and x/z positions.
-- Positions are saved every ~10 seconds and on clean WebSocket disconnect / graceful shutdown.
-- There is no account recovery, password login, session renewal or character roster.
-- Two clients sharing the same stored token cannot simultaneously control the same character. For a two-player test, use separate browser profiles or devices.
-- A token from one database is invalid against a new/reset database; the current client does **not** automatically register a new token after an invalid-token response.
-
-### Boundaries of server authority
-
-**Authoritative:** guest identities within this server, x/z movement, nearby visibility and saved positions; additionally the online starter wolf encounter's health, attacks, movement, player vitals and respawn timers (combat state resets on server restart).
-
-**Not authoritative:** terrain collision, physics dash movement, gathering, map fog, discoveries, settlements, NPC economies, inventory, currency, world edits and building ownership. **Authoritative prototype only:** the shared starter wolf, attack/dodge validation, damage, stamina, death and respawn.
-
-**Not production-safe:** public plain-WS exposure, localStorage bearer tokens, missing origin policy, account security, load testing, persistent shared world state and horizontal scaling. Use a private LAN for early testing; public deployment requires `wss://`, an authentication strategy and protective controls.
-
-## Technology and repository layout
-
-| Layer | Technology |
-| --- | --- |
-| Client renderer | Three.js 0.181.x |
-| Game/application code | TypeScript 5.9.x |
-| Package manager and server runtime | Bun (CI pinned to 1.3.3) |
-| Web tooling | Vite 7.x |
-| Android wrapper | Capacitor 7.x |
-| Android build | Gradle + JDK 21 / Android SDK |
-| 3D asset automation | Blender 4.x / headless Python |
-| Multiplayer transport | Bun WebSocket |
-| Guest-character storage | SQLite (`bun:sqlite`) |
-| Automation | GitHub Actions |
+## Repository layout
 
 ```text
 .
-├── apps/
-│   ├── client/
-│   │   ├── src/
-│   │   │   ├── main.ts                  # Three.js scene + gameplay bootstrap
-│   │   │   ├── world/                   # Terrain, chunks, roads, towns, landmarks
-│   │   │   ├── characters/              # Procedural rigs and GLB loader
-│   │   │   ├── gameplay/combat.ts       # Local combat constants/helpers
-│   │   │   ├── input/touchCamera.ts     # Touch zoom math
-│   │   │   ├── ui/worldMap.ts           # Atlas and fog-of-war
-│   │   │   └── multiplayer/client.ts    # WebSocket snapshots and remote avatars
-│   │   └── capacitor.config.ts
-│   └── server/
-│       └── src/
-│           ├── index.ts                # Bun HTTP/WebSocket + SQLite
-│           ├── protocol.ts             # Message schemas and validation
-│           └── simulation.ts           # Fixed-step movement + AOI snapshots
-├── tools/
-│   ├── blender/                          # GLB generator + validator
-│   └── smoke-server.ts                  # Live two-client WebSocket check
-├── test/                                 # Bun unit tests (11 test files)
-├── docs/                                 # System-specific design and QA notes
+├── apps/client/                 # @realms/client — Vite, Three.js, Capacitor
+│   ├── src/main.ts              # Scene, HUD, title-screen wiring
+│   ├── src/characters/          # Procedural races and GLB loading
+│   ├── src/multiplayer/         # WebSocket client and movement prediction
+│   ├── src/ui/                  # Title, creator, menu, bag, quests, map
+│   ├── src/world/               # Chunks, terrain, collision, landmarks
+│   └── capacitor.config.ts
+├── apps/server/                 # @realms/server — Bun HTTP + WebSocket
+│   ├── src/index.ts             # Process entry, /health, /ws, shutdown
+│   ├── src/protocol.ts          # Protocol 11 and message checks
+│   ├── src/accounts.ts
+│   ├── src/simulation.ts
+│   ├── src/combat.ts
+│   ├── src/inventory.ts
+│   ├── src/quests.ts
+│   ├── src/resources.ts
+│   └── railway.json             # Health check path only
+├── apps/shared/src/             # Faction, race, and class catalog
+├── tools/blender/               # Headless GLB generators and validators
+├── tools/smoke-server.ts        # Live two-client WebSocket smoke test
+├── test/                        # bun test
+├── docs/                        # Longer system notes
 └── .github/workflows/
     ├── android-debug-apk.yml
     └── blender-assets.yml
 ```
 
-## Prerequisites and local setup
+Root `package.json` workspaces are `apps/*` and `packages/*`. The packages that exist are `@realms/client` and `@realms/server`. `apps/shared` has no `package.json`; client and server import it by relative path. There is no `packages/` directory.
 
-### Basic development
+| Script | What it runs |
+| --- | --- |
+| `bun run dev` | Server and client together (`bun run --parallel`) |
+| `bun run dev:server` | `bun --watch src/index.ts` in `apps/server` |
+| `bun run dev:client` | `vite --host 0.0.0.0` in `apps/client` |
+| `bun run build` | Client typecheck and Vite build (`apps/client/dist`) |
+| `bun run check` | `tsc --noEmit` for client and server |
+| `bun test` | Every `test/*.test.ts` file |
 
-1. Install [Bun](https://bun.sh/) (CI uses **1.3.3**), Git and a modern browser.
-2. Clone the repository and install workspaces:
+Stack versions in the manifests: TypeScript 5.9.x, Three.js 0.181.x, Vite 7.x, Capacitor 7.x. The Android workflow installs Bun 1.3.3 and Temurin JDK 21.
+
+## Prerequisites
+
+- [Bun](https://bun.sh/) for install, the server, tests, and the web client. The Android workflow pins **1.3.3**.
+- Git and a current desktop browser.
+- Android builds also need JDK 21 and an Android SDK with `ANDROID_HOME` set.
+- Local rigged models need Blender and `python3-numpy`. Generated GLBs are build outputs and are absent from git. Without them, heroes and the wolf stay on the procedural meshes.
+
+## Quick start
 
 ```bash
 git clone https://github.com/mtdewwolf/realms-unwritten.git
 cd realms-unwritten
 git switch Master
 bun install
-```
-
-3. Validate TypeScript and tests:
-
-```bash
-bun run check
-bun test
-```
-
-4. Start the server and web client in separate terminals:
-
-```bash
 bun run dev:server
-# Other terminal, from repository root:
+```
+
+In a second terminal, from the repository root:
+
+```bash
 bun run dev:client
 ```
 
-Or start both with `bun run dev`. Vite usually serves at `http://localhost:5173` unless that port is occupied. The Bun server is `http://localhost:3001` by default.
+`bun run dev` starts both. The server listens on port **3001** and prints `Realms Unwritten server on … (WebSocket: /ws)`. Vite does not set a port in `apps/client/vite.config.ts`, so it uses Vite’s default **5173** and prints another port if 5173 is taken. Open the URL Vite prints (usually `http://localhost:5173`).
 
-5. Open `http://localhost:5173`, explore offline or enter `ws://localhost:3001/ws` in the multiplayer URL field and tap **CONNECT**.
-
-**Assets:** The CI builds the actual GLBs before building the web client. A fresh local checkout has **no committed `apps/client/public/assets/*.glb` files**; without running Blender generation, the web app should use its procedural visual fallbacks. Follow the [Blender asset pipeline](#blender-asset-pipeline) section if you want locally generated rigged models.
-
-### LAN play on Android
-
-The host PC and the phone need network access to each other (same LAN or permitted routed network). Start Bun on your computer and determine the computer's **LAN IP**, e.g. with `hostname -I` on Ubuntu. In the APK enter:
+On the title screen, set **Realm server** to:
 
 ```text
-ws://192.168.1.50:3001/ws
+ws://127.0.0.1:3001/ws
 ```
 
-**Replace `192.168.1.50` with your computer's actual IP.** Do not use `localhost` on a phone to reach a different computer. Ensure the firewall allows TCP 3001 and avoid guest Wi-Fi/client-isolation networks. Android **debug** manifests permit cleartext networking; production needs a secure `wss://` endpoint.
+Then **Create account** or **Sign in**. A new account opens the character creator (faction, race, and class) before the world loads. **Offline demo** skips the server. **Continue legacy guest** resumes a guest token already stored in that browser.
 
-### Railway
-
-The hosted game server is only the Bun package `@realms/server`. In Railway the service root directory is `apps/server`, and Railpack starts `bun src/index.ts`. Leave that start command as detected. This service does not build or serve the Vite client.
-
-Mount a volume at `/data` and set:
-
-```text
-WORLD_DB_PATH=/data/realms-world.sqlite
-```
-
-The process creates the parent directory of `WORLD_DB_PATH` when it is missing. It binds `0.0.0.0` and uses Railway's `PORT`. Do not set `HOST` or `PORT`. `apps/server/railway.json` pins the deploy health check to `GET /health` and does not change the build or start command. Use one replica; the world database is a single SQLite file.
-
-On the Android title screen, enter the realm URL `wss://<your-domain>/ws`. The current production realm is `wss://realmsserver-production.up.railway.app/ws`. Railway terminates TLS and forwards that WebSocket to the container.
-
-A redeploy sends SIGTERM. The server saves positions, checkpoints the SQLite WAL into the main database file, and closes it before exiting.
-
-These accounts stay prototype-grade on the hosted server. Passwords are Argon2id hashes and sessions last 30 days, but there is no email recovery, global rate limiting, or account management. Use a unique password. This is not production-ready account security.
-
-## Building Android APKs
-
-### Preferred — GitHub Actions
-
-1. Open **[Android Debug APK](https://github.com/mtdewwolf/realms-unwritten/actions/workflows/android-debug-apk.yml)**.
-2. Select **Run workflow** on branch `Master`, or push a commit to `Master`.
-3. Verify each step is green: checkout, Bun install, typecheck/tests, Blender dependencies, GLB generation/validation, live WebSocket smoke test, Vite build, Capacitor sync, Gradle APK compile and artifact upload.
-4. Download artifact **`realms-unwritten-debug-apk`** from the completed workflow run (GitHub may require signing in).
-5. Extract the artifact and install `app-debug.apk` onto a test device.
-6. Check boot, touch controls, landscape/portrait layouts, offline mode and LAN multiplayer manually.
-
-CI **already passed** at [run #43148146024](https://github.com/mtdewwolf/realms-unwritten/actions/runs/43148146024), for source commit `0c24d4e`. Later commits should be checked independently.
-
-**Artifact retention:** Android debug APK ~14 days; dedicated character GLBs ~30 days. Artifacts are not automatically published as releases or installed on devices.
-
-### Local Android build (Ubuntu / suitable Windows environment)
-
-Install **JDK 21**, a working Android SDK, Bun and Blender with NumPy available to Blender's exporter. Ensure `ANDROID_HOME` points to the SDK.
+Check the process before connecting:
 
 ```bash
-bun install
-bun run check
-bun test
-
-# Ubuntu package example; use your distro-specific package manager if necessary.
-sudo apt-get install blender python3-numpy
-mkdir -p apps/client/public/assets
-blender --background --factory-startup --python-exit-code 1 \
-  --python tools/blender/generate_characters.py -- \
-  --out apps/client/public/assets
-python3 tools/blender/validate_glb.py apps/client/public/assets
-
-bun run build
-cd apps/client
-bunx cap add android
-bunx cap sync android
-cd android
-chmod +x gradlew
-./gradlew --no-daemon assembleDebug
+curl -fsS http://127.0.0.1:3001/health
 ```
 
-Expected APK: `apps/client/android/app/build/outputs/apk/debug/app-debug.apk`.
+The in-game Multiplayer panel, on `localhost` or `127.0.0.1`, prefills `ws://<page hostname>:3001/ws`. Its Connect button returns you to the title screen with that URL; it does not open the socket by itself.
 
-The repository does not commit the generated `apps/client/android/` native project; regenerate it on clean checkouts. For LAN testing, the CI adds `android:usesCleartextTraffic="true"` **only for debug builds**. If compiling locally from scratch, replicate that debug manifest as described in [the workflow](.github/workflows/android-debug-apk.yml), or use `wss://`. Do **not** enable arbitrary cleartext traffic in production.
+For a phone on the same LAN, use the computer’s LAN address, for example `ws://192.168.1.50:3001/ws`, with TCP 3001 reachable. `localhost` on the phone is the phone. A public client needs `wss://`.
 
-Optional install with ADB:
+## Configuration
 
-```bash
-adb devices
-adb install -r apps/client/android/app/build/outputs/apk/debug/app-debug.apk
-```
+The server reads three environment variables in `apps/server/src/index.ts`. Nothing else is required for a local run.
 
-## Blender asset pipeline
+| Variable | Default | Role |
+| --- | --- | --- |
+| `HOST` | `0.0.0.0` | Bind address. |
+| `PORT` | `3001` | HTTP and WebSocket port. |
+| `WORLD_DB_PATH` | `data/realms-world.sqlite` | SQLite file, relative to the process working directory. `:memory:` skips creating a directory and is what tests use for a throwaway database. |
 
-**Dedicated workflow:** [Build Blender Character Assets](https://github.com/mtdewwolf/realms-unwritten/actions/workflows/blender-assets.yml).
+`bun run dev:server` runs with working directory `apps/server`, so the default file is `apps/server/data/realms-world.sqlite`. Starting with `bun apps/server/src/index.ts` from the repository root uses `data/realms-world.sqlite` there instead. The process creates the parent directory when the path is not `:memory:`.
 
-It installs Blender + NumPy, runs the original Python generator, validates GLB v2 structure/rig/clip names, produces SHA-256 sums, and uploads the **`realms-unwritten-character-glbs`** artifact containing `adventurer.glb`, `wolf.glb`, and `SHA256SUMS`.
+Positions are written about every 10 seconds, on disconnect, and on SIGINT or SIGTERM. Shutdown runs `PRAGMA wal_checkpoint(TRUNCATE)` and closes the database before exit.
 
-Local regeneration:
-
-```bash
-mkdir -p build/assets
-blender --background --factory-startup --python-exit-code 1 \
-  --python tools/blender/generate_characters.py -- --out build/assets
-python3 tools/blender/validate_glb.py build/assets
-sha256sum build/assets/*.glb
-```
-
-The Android workflow independently generates the GLBs under the client's `public/assets/` folder before Vite bundles them. Generated assets are reproducible **blockouts**, not a polished production art library.
-
-## All automated and manual testing steps
-
-Run tests from the **repository root**, unless a subsection explicitly changes directory. An automated pass only validates that specific contract; actual Android responsiveness and gameplay must also be checked on real hardware.
-
-### A. Fast developer gate (every change)
-
-```bash
-bun install
-bun run check
-bun test
-bun run build
-```
-
-**Expected:** No TypeScript errors; all Bun tests pass; Vite produces `apps/client/dist/`. `bun run build` can still use procedural visual fallbacks if local GLBs have not been generated, so additionally run the asset pipeline when testing rigged models.
-
-Existing Bun test files cover:
-
-| Test file | What it checks |
-| --- | --- |
-| `test/bootstrap.test.ts` | Project/bootstrap invariants |
-| `test/assets.test.ts` | Asset catalog/limits |
-| `test/glb-wiring.test.ts` | GLB URL wiring |
-| `test/touch-camera.test.ts` | Pinch and camera input math |
-| `test/combat-demo.test.ts` | Local attack/stamina math |
-| `test/chunked-world.test.ts` | Chunk indexing, bounds and deterministic placement |
-| `test/terrain.test.ts` | World seam heights, collision sampler and grid sizes |
-| `test/world-landmarks.test.ts` | Landmark stability and chunk ownership |
-| `test/settlements.test.ts` | Settlement locations, ownership and road-grid spacing |
-| `test/world-map.test.ts` | Map projection, fog-cell addressing and compass guidance |
-| `test/server-simulation.test.ts` | Authoritative movement, sequence rejection, bounds and proximity |
-| `test/server-combat.test.ts` | Shared wolf health, range/cooldown/dodge validation, respawn |
-| `test/inventory.test.ts` | Atomic reward grants, duplicate prevention and eligibility |
-| `test/quests.test.ts` | Persistent quest progress, kill deduplication, one-time turn-in, guard range |
-| `test/progression.test.ts` | XP receipts, leveling, persistence, quest atomicity |
-| `test/equipment.test.ts` | Weapon ownership, quest reward atomicity, persistent gear, damage scaling |
-
-Focused runs:
-
-```bash
-bun test test/server-simulation.test.ts test/server-combat.test.ts
-bun test test/chunked-world.test.ts test/terrain.test.ts
-bun test test/world-landmarks.test.ts test/settlements.test.ts test/world-map.test.ts
-bun test test/combat-demo.test.ts test/touch-camera.test.ts
-```
-
-### B. Live server integration smoke test
-
-```bash
-bun tools/smoke-server.ts
-```
-
-**Expected:** Output similar to `PASS multiplayer smoke: 2 guests, authoritative position and nearby snapshots` and exit code 0. This test starts a temporary Bun server with an isolated SQLite file, waits for `/health`, connects **two distinct guests**, sends movement input, validates that the second guest receives the moved player, shuts down the process and removes temporary data. It does **not** currently certify reconnection across server restarts, authentication security, actual phone sockets, or hundreds of concurrent players.
-
-Run this in addition to `bun test`; it is not a normal `test/*.test.ts` unit test.
-
-### C. Server health and direct connection
-
-1. Start the server:
-
-   ```bash
-   bun run dev:server
-   ```
-
-2. Query health:
-
-   ```bash
-   curl -fsS http://127.0.0.1:3001/health
-   ```
-
-3. Verify response has `"ok":true`, protocol version `11`, and the online player count.
-4. Open the client and connect to `ws://127.0.0.1:3001/ws` (when client and server are on the same machine).
-5. Confirm the connection-status message switches to online. Disconnect and verify offline exploration continues.
-6. In the terminal, check for runtime exceptions and ensure the server remains running.
-
-For isolated testing without touching existing character data:
+Isolated database on loopback:
 
 ```bash
 HOST=127.0.0.1 PORT=3001 WORLD_DB_PATH=/tmp/realms-unwritten-qa.sqlite \
   bun apps/server/src/index.ts
 ```
 
-### D. Two-player LAN multiplayer manual test
+`apps/client` has no game server variables. The realm URL is typed on the title screen and remembered as `realms-unwritten-server-url`.
 
-**Important:** Use two distinct guest identities—e.g., a phone and a separate browser profile. Two normal tabs in the *same* browser profile share a guest token and the server rejects duplicate sessions by design.
+## Deploy the realm server on Railway
 
-1. Start Bun on a host accessible over the LAN, confirm TCP port 3001 is open.
-2. Connect Device A and Device B to `ws://<HOST_LAN_IP>:3001/ws`.
-3. Both should join without errors and show a character near the starter area.
-4. Move A using its joystick/WASD; B should see A move.
-5. Move B; A should see B move. Check remote facing and stop behavior.
-6. Disconnect B; A should no longer render B.
-7. Reconnect B with its existing token; the character should return to its saved server position.
-8. Restart Bun gracefully and reconnect each client; saved x/z positions should be restored.
-9. Walk beyond the **160-meter** nearby-player radius; distant players should disappear from each other's local rendering. Return and verify they reappear.
-10. Switch off the server or network: gameplay should remain explorable offline and remote avatars should disappear.
-11. Test from Android on both Wi-Fi and a routed network only when the server is reachable; do not use `localhost` on the phone to access a different machine.
-12. Confirm no repeated console errors, runaway memory or stuck movement after reconnect.
+Deploy only `@realms/server`. Set the service root directory to `apps/server`. The start script in `apps/server/package.json` is `bun src/index.ts`. Leave that command as detected. This service does not build or serve the Vite client.
 
-**Expected limitations:** remote players use procedural representations, not full rigged GLBs. Combat and map discoveries are not shared. Rejoining a wiped/new server database with an existing guest token currently returns an invalid-credential error; preserving the database is required for identity continuity.
+`apps/server/railway.json` sets the deploy health check to `GET /health` and does not override the build or start command.
 
-### E. Input, camera and mobile lifecycle
-
-On an Android device or touchscreen browser:
-
-1. Hold joystick forward, backward, left, right and diagonal; check speed does not multiply diagonally.
-2. While moving, drag another finger on the terrain to rotate the camera.
-3. Pinch both directions and verify the zoom remains within its minimum/maximum bounds.
-4. Release one finger while pinching, then continue dragging: no camera jump or stuck gesture.
-5. Hold joystick, background the app or switch apps, return: movement must stop rather than continue indefinitely.
-6. Test the attack/dodge/gather buttons separately, including rapid tapping.
-7. Rotate between portrait and landscape; ensure essential controls, map, multiplayer entry, and status indicators remain reachable.
-8. Open the map while using touch controls and verify it does not unintentionally capture world-camera drags.
-9. Test input with physical keyboard attached as well as touchscreen where available.
-
-### F. Wolf combat gameplay (offline and authoritative online)
-
-1. Start offline near the wolf.
-2. Confirm wolf health **60**, player health **100**, stamina **100**.
-3. Walk within attack range and tap ATTACK: wolf health drops by **20** and stamina drops by **16**, subject to cooldown.
-4. Tap ATTACK from outside range: no wolf damage, and combat UI indicates out-of-range.
-5. Allow stamina to regenerate; verify repeated attacks cannot bypass cooldown/stamina costs.
-6. Walk near wolf and watch its ~850 ms attack warning.
-7. Dodge during wind-up: stamina should drop by **26** and the bite should miss if within the dodge window.
-8. Stay within wolf bite range without dodging: health should drop by **12** on a hit.
-9. Defeat the wolf (three 20-damage successful hits); confirm the wolf cannot be damaged further.
-10. Offline outcomes are local. Online, both clients must see the same server wolf HP/phase and their own authoritative vitals; combat state is not currently persisted across a server restart.
-11. Check behavior with zero player health; actions/movement should be disabled appropriately.
-
-### G. World generation and streaming
-
-1. Start at the flat Verdant Reach area, confirm buildings/props are visible and ground is aligned.
-2. Walk more than **50 m** away from the start in all four directions—the old demo boundary must not block travel.
-3. Verify the chunk HUD updates and nearby chunk count stays **≤25**.
-4. Cross positive and negative chunk coordinates, including at x/z = 0.
-5. Inspect terrain seams: no visible holes/cracks between adjacent meshes.
-6. Walk over hills and valleys; the player should visually follow the terrain without floating or sinking.
-7. Leave a distant chunk and come back; trees, rocks, landmarks and settlements should reappear consistently.
-8. Observe road ribbons crossing chunk borders and hills; note any floating sections, surface clipping, or incorrect alignments.
-9. Check that the village remains near y=0 and hills transition gradually away from it.
-10. Travel toward the world edge (using a temporary development/debug helper if necessary); x/z should remain within approximately ±8190 m.
-11. Spend 10–15 minutes crossing many chunk borders while watching FPS, heat and memory. This **manual performance test has not been certified**.
-
-### H. Landmarks, settlements, discoveries and map
-
-1. Find a watchtower, ore outcrop, and wolf den in generated areas. Verify they are visible and stable on revisits.
-2. Approach a landmark within about **16 m**; its discovery count/status should update.
-3. Walk near a generated hamlet/outpost within about **28 m**; confirm settlement discovery.
-4. Revisit it after leaving the chunk; its name/location should remain consistent.
-5. Open MAP; initially unrevealed cells should be obscured.
-6. Explore and reopen MAP; traveled 64-meter cells should be revealed.
-7. Confirm only discovered landmarks/towns appear as markers.
-8. Tap an **explored** cell, set a waypoint, follow distance/compass guidance; approach within ~8 m to complete.
-9. Tap an **unexplored** cell: it should not set a destination.
-10. Clear a destination and verify guidance resets.
-11. Reload/restart the app: visited cells and discovery IDs should remain in localStorage.
-12. With a separate browser profile, verify exploration progress is not automatically shared.
-13. Explicitly test **GATHER** and confirm it reports pending authoritative gathering rather than inventing loot.
-
-### I. Character asset and animation QA
-
-1. Generate both GLBs with Blender and run the validation script:
-
-   ```bash
-   blender --background --factory-startup --python-exit-code 1 \
-     --python tools/blender/generate_characters.py -- --out build/assets
-   python3 tools/blender/validate_glb.py build/assets
-   ```
-
-2. Confirm both assets are nonempty GLB version 2, contain meshes/skins, and have required named clips.
-3. Confirm `adventurer.glb` and `wolf.glb` load in the client and are correctly positioned relative to the ground.
-4. Test idle, walking, sword attack, dodge, wolf movement, wolf attack and death transitions.
-5. Verify the procedural fallback remains visible when GLBs are **deliberately absent** or invalid.
-6. Inspect skeleton pivot artifacts, clipping, incorrect facing and animation loops.
-7. On Android, check frame-time and GPU skinning costs rather than assuming small files guarantee good runtime performance.
-8. When downloaded from Actions, verify the SHA-256 sums: `sha256sum -c SHA256SUMS` from the extracted artifact directory.
-
-### J. Persistence and failure recovery
-
-1. With the isolated SQLite DB, connect, move and disconnect cleanly; reconnect and verify position.
-2. Restart the Bun process gracefully and reconnect; verify positions survive the restart.
-3. Try a second simultaneous connection with the **same token**: expect rejection, not duplicate control.
-4. Use an intentionally malformed/expired/wrong guest token; verify clear failure without server crash.
-5. Send out-of-order, repeated or invalid movement messages via a test client; position should not teleport.
-6. Disconnect unexpectedly; server should stop movement and remove nearby visibility.
-7. Remove or rename the **test** database and reconnect with a formerly saved token; document the current invalid-token behavior.
-8. Never delete a real player's DB to run these cases. Keep backups of SQLite data before schema changes.
-
-### K. Android smoke and performance acceptance
-
-Test on at least one actual Android phone:
-
-| Check | Expected evidence |
-| --- | --- |
-| Install and launch | APK installs; no crash / blank WebView |
-| Offline launch | World renders without server available |
-| Assets | GLBs or intentional fallback visible |
-| Controller | Joystick, camera drag, pinch, attack/dodge all respond |
-| Navigation | MAP, fog, waypoint and markers are usable |
-| Streaming | Many chunk crossings without terrain holes or memory runaway |
-| Multiplayer | Two devices share a server; positions replicate, disconnect cleans up |
-| Reconnect | Persistent guest position survives graceful server restart |
-| Performance | Record frame rate (target **30 FPS**), dropped frames, RAM and temperature over 10–15 min |
-| Lifecycle | Background/resume, rotation, screen lock/unlock, Wi-Fi disconnect |
-| Crash diagnostics | Save `adb logcat` output and server logs when a failure occurs |
-
-Useful Android commands:
-
-```bash
-adb devices
-adb install -r apps/client/android/app/build/outputs/apk/debug/app-debug.apk
-adb logcat -c
-adb logcat > android-session.log
-# Stop capture with Ctrl+C and attach the log to your issue report.
-```
-
-**30 FPS is a project target, not a verified benchmark.** Actual battery, CPU/GPU memory and thermal behavior must be measured on hardware.
-
-### L. Regression gate before merging/releasing
-
-- [ ] `bun run check` passes for **both** client and server.
-- [ ] `bun test` passes.
-- [ ] `bun tools/smoke-server.ts` passes.
-- [ ] Blender generator and GLB validator pass.
-- [ ] `bun run build` completes.
-- [ ] Android Gradle `assembleDebug` succeeds and artifact exists.
-- [ ] Offline exploration still works.
-- [ ] Two distinct guest clients can connect and see movement.
-- [ ] In protocol v10, they agree on shared wolf HP/phase and rejected forged attacks.
-- [ ] Position persistence survives a graceful restart.
-- [ ] World chunks, road geometry, map and discovery states remain stable.
-- [ ] Real Android device boot/controls/performance verified for release candidates.
-- [ ] Any failed test has a reproducible log, device/build info and tracking issue.
-
-Suggested bug report:
+Use **one replica**. The world is a single SQLite file, with no sharding. Mount a volume at `/data` and set:
 
 ```text
-Commit / branch:
-APK Actions run / artifact:
-Device + Android version (or browser):
-Server Bun version / host OS:
-World coordinates / chunk:
-Steps to reproduce:
-Expected:
-Observed:
-Logcat / Bun log:
-Frequency:
+WORLD_DB_PATH=/data/realms-world.sqlite
 ```
 
-## Known limitations, security, and troubleshooting
+Do not set `HOST` or `PORT`. The process binds `0.0.0.0` and uses the `PORT` Railway injects. Railway terminates TLS. Players connect with:
 
-### Current technical limitations
+```text
+wss://<your-domain>/ws
+```
 
-- Single-process server and SQLite database; no horizontal scaling, rediscovery across shards, interest spatial index or production observability.
-- Local terrain/world objects are not validated by the server. Online starter wolf damage is authoritative, but terrain collision, loot, enemy-spawn scaling and other encounters are not.
-- Touch UI may overlap on smaller displays; portrait and accessibility layouts require QA.
-- Realtime movement uses server snapshots with simple correction rather than full client prediction/replay.
-- The client does not automatically reconnect when the server returns after an outage.
-- Guest token storage is local browser/WebView storage; no secure auth or account recovery.
-- Static procedural character copies for other players have no full animation replication.
-- World scenery is largely low-poly placeholders and may intersect roads or spawn too close to objects.
-- No backend-controlled inventory, economics, or durable world entities.
-- No load tests, anti-cheat threat model, player moderation or production operation runbooks.
+A redeploy sends SIGTERM. The handler saves positions, checkpoints the WAL into the main database file, closes it, and stops the HTTP server.
 
-### Troubleshooting guide
+Accounts on that host are the same prototype: Argon2id hashes and 30-day sessions, without email recovery or a global rate limit beyond the per-socket cap of 40 messages per second.
 
-| Symptom | Likely cause / next check |
+## Android app
+
+Capacitor config (`apps/client/capacitor.config.ts`): app id `game.realmsunwritten.client`, app name `Realms Unwritten`, web assets from `dist`. `android.allowMixedContent` is false. The generated `apps/client/android/` project is gitignored.
+
+### GitHub Actions
+
+Workflow [Android Debug APK](https://github.com/mtdewwolf/realms-unwritten/actions/workflows/android-debug-apk.yml) runs on every push to `Master` or `main`, and from **Run workflow**. On `ubuntu-latest` it installs Bun 1.3.3 and JDK 21, then `bun install`, `bun run check`, `bun test`, Blender GLB generation and lineup renders, `bun tools/smoke-server.ts`, `bun run build`, `bunx cap add android`, a debug cleartext manifest, `bunx cap sync android`, and `./gradlew --no-daemon assembleDebug`.
+
+Artifacts, kept 14 days:
+
+- `realms-unwritten-debug-apk` — `app-debug.apk`
+- `realms-unwritten-actual-race-lineups` — the two faction preview PNGs
+
+Install the debug APK on a device and point **Realm server** at a reachable URL. Debug CI turns on cleartext so `ws://` works on the LAN. A release build should use `wss://`.
+
+### Local debug APK
+
+JDK 21, the Android SDK (`ANDROID_HOME`), Bun, and Blender with NumPy:
+
+```bash
+bun install
+bun run check
+bun test
+sudo apt-get install -y --no-install-recommends blender python3-numpy
+mkdir -p apps/client/public/assets
+python3 -m py_compile tools/blender/generate_races.py tools/blender/render_lineup.py
+blender --background --factory-startup --python-exit-code 1 \
+  --python tools/blender/generate_characters.py -- \
+  --out apps/client/public/assets
+python3 tools/blender/validate_glb.py apps/client/public/assets
+blender --background --factory-startup --python-exit-code 1 \
+  --python tools/blender/generate_races.py -- \
+  --out apps/client/public/assets
+python3 tools/blender/validate_races.py apps/client/public/assets
+bun run build
+cd apps/client
+bunx cap add android
+mkdir -p android/app/src/debug
+cat > android/app/src/debug/AndroidManifest.xml <<'MANIFEST'
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <application android:usesCleartextTraffic="true" />
+</manifest>
+MANIFEST
+bunx cap sync android
+cd android
+chmod +x gradlew
+./gradlew --no-daemon assembleDebug
+```
+
+The APK is `apps/client/android/app/build/outputs/apk/debug/app-debug.apk`. The cleartext manifest matches the debug overlay in `.github/workflows/android-debug-apk.yml`. Omit it when the realm URL is `wss://`.
+
+## Art pipeline
+
+Headless Blender Python under `tools/blender/` builds the rigged prototypes. Generated files are not committed. Validators use the Python standard library. Generation and lineup renders run inside Blender and need `python3-numpy` for the exporter.
+
+| Script | Output |
 | --- | --- |
-| APK Actions fails at type checking | Read the failing `bun run check` diagnostic; fix TS before retrying |
-| Blender export missing GLB | Install `blender` and `python3-numpy`; run `--python-exit-code 1`; validate outputs |
-| Web app shows simple procedural character | GLB file not generated / wrong `/assets/*.glb` path; fallback is intentional |
-| Android cannot connect to Bun | Wrong LAN IP, host firewall, guest Wi-Fi isolation, server not started, or cleartext policy |
-| Browser cannot connect to WSS | Secure page usually requires `wss://`; configure valid TLS/proxy |
-| "Character already connected" | Same guest token in two browser tabs/profiles; use distinct identity stores |
-| "Unknown guest token" | Connecting to a different/reset server DB; guest token cannot be recovered there |
-| Client moves offline but no second player appears | Verify both clients connected; use separate guest profiles and remain within 160 m |
-| Map doesn't reveal old locations on another device | Exploration is localStorage-only, not account-synced |
-| Gather button doesn't produce items | Gathering feature is not implemented |
-| Wolf combat differs between clients | Confirm both use protocol v2 and are online; shared wolf combat is authoritative, offline wolf fights remain local |
-| Gradle fails on local build | Verify JDK 21, SDK location, Android build tools and generated Capacitor project |
-| Performance drops after travel | Profile streamed geometry, chunk churn, draw calls, WebView memory and thermal throttling |
+| `generate_characters.py` | `adventurer.glb` (`idle`, `walk`, `attack`, `dodge`) and `wolf.glb` (`idle`, `walk`, `attack`, `death`) |
+| `generate_races.py` | 24 files, `hero-<race>-<class>.glb`, each with `idle`, `walk`, `attack`, `dodge`, `cast`, `death` |
+| `render_lineup.py` | `lineup-radiant-accord.png` and `lineup-umbral-dominion.png` from the exported race GLBs |
+| `validate_glb.py` | Checks `adventurer.glb` and `wolf.glb` for glTF 2, a skin, and those clips |
+| `validate_races.py` | Checks all 24 race GLBs and prints `PASS 24 race/class rigs and required clips` |
 
-### Security rules for future public deployment
+The client loads `/assets/wolf.glb` and `/assets/hero-<race>-<class>.glb`. The procedural mesh stays up until that load succeeds. `adventurer.glb` is still produced and validated; the player avatar does not mount it.
 
-1. Put a supported TLS reverse proxy/ingress in front of the Bun server and use **WSS**.
-2. Replace bearer tokens in localStorage with a proper auth/session lifecycle.
-3. Add strict WebSocket origin verification, edge rate limits, audit logs, bans and abuse monitoring.
-4. Validate server-driven interactions: movement with real collision, combat, loot, economy and construction.
-5. Secure and back up the SQLite data store; plan migrations before adding persistent inventory/world entities.
-6. Add spatial interest indexing, load testing and sharding/region partitioning when concurrency demands it.
+Put playable files in `apps/client/public/assets` so Vite serves them at `/assets/…`:
 
-**Do not publicly expose this prototype server as-is.**
+```bash
+mkdir -p apps/client/public/assets build/lineup-previews
+blender --background --factory-startup --python-exit-code 1 \
+  --python tools/blender/generate_characters.py -- \
+  --out apps/client/public/assets
+blender --background --factory-startup --python-exit-code 1 \
+  --python tools/blender/generate_races.py -- \
+  --out apps/client/public/assets
+python3 tools/blender/validate_glb.py apps/client/public/assets
+python3 tools/blender/validate_races.py apps/client/public/assets
+blender --background --factory-startup --python-exit-code 1 \
+  --python tools/blender/render_lineup.py -- \
+  --assets apps/client/public/assets --out build/lineup-previews
+```
 
-## Outstanding work and milestones
+Two workflows:
 
-### Priority 1 — Make the multiplayer foundation game-authoritative
+- [Build Blender Character Assets](https://github.com/mtdewwolf/realms-unwritten/actions/workflows/blender-assets.yml) runs on `ubuntu-24.04` when `tools/blender/**` or that workflow file changes on `Master` or `main`, and from **Run workflow**. It builds and validates `adventurer.glb` and `wolf.glb`, writes `SHA256SUMS`, and uploads `realms-unwritten-character-glbs` (kept 30 days). It does not build the 24 race models.
+- The Android workflow builds both generators, validates them, renders the two lineup PNGs, and bundles whatever landed in `apps/client/public/assets` into the web build and the APK.
 
-- Proper movement prediction/reconciliation, server-side collision and terrain constraints.
-- Stable player identity/account login and safe reconnect flows.
-- Shared protocol package and strict version negotiation.
-- Spatial index for nearby entities, robust disconnect/presence handling.
-- Deployment, TLS, metrics and backup/recovery.
+These meshes are generated blockouts: rigid skinning, no hand-painted production textures, and no device frame-time budget in CI. More detail is in [Blender pipeline](docs/assets/BLENDER_PIPELINE.md) and [eight-race lineup](docs/RACE_LINEUP_OVERHAUL.md).
 
-### Priority 2 — Deliver one complete RPG vertical slice
+## Testing and CI
 
-- Expand the starter guard quest to real NPC conversations and dialogue.
-- Expand persistent Wolf Hunt to multiple quests, branching objectives and a proper quest log.
-- Inventory, basic gear and item rewards.
-- Server-owned gathering and resource depletion.
-- Extend persistent XP and level attributes into skills, classes and meaningful combat effects.
+From the repository root:
 
-### Priority 3 — Expand the authoritative combat vertical slice
+```bash
+bun run check
+bun test
+```
 
-- Expand the one authoritative starter wolf into server-owned wildlife territories, multiple enemy types, threat rules and proper spawn ownership.
-- Extend basic validated attack/dodge, health and respawn to real skills, spatial collision and equipment-driven damage.
-- Combat feedback, targeting and loot attribution.
-- Persist relevant player health/progression, synchronize combat outcomes and implement loot/death recovery.
+`bun run check` is `tsc --noEmit` for `apps/client/tsconfig.json` and `apps/server/tsconfig.json`. `bun test` runs the files in `test/`, including accounts, character creation, the eight-race catalog, combat, gathering, crafting, quests, movement prediction, a live gather against a spawned server, and SIGTERM checkpointing.
 
-### Priority 4 — Meaningful world and economy
+`bun run build` typechecks the client again and writes `apps/client/dist`. It succeeds without GLBs; the procedural fallbacks cover that case.
 
-- Fully designed settlements with shops, crafting stations and quests.
-- Production biomes/terrain features, roads, rivers, bridges and dungeons.
-- Crafting professions, resource supply/demand, trading and currency sinks.
-- Travel/fog/waypoint persistence per account and groups.
+The live smoke test is separate from `bun test`. It starts a server on a temporary SQLite file, waits for `/health`, and checks two guests, shared combat, quests, equipment, rejected forged gather and craft packets, guest resume, account registration, character creation, session resume, and password sign-in:
 
-### Priority 5 — MMO operations and release readiness
+```bash
+bun tools/smoke-server.ts
+```
 
-- Region servers, durable world state, persistence migrations and scale testing.
-- Parties/guilds, chat, moderation, player safety and social features.
-- Android optimization, 30 FPS performance budgets, audio, accessibility, UX polish.
-- Security review, signing, testing tracks, crash reporting and Android store release.
+A passing run prints:
 
-**Recommended near-term acceptance milestone:** two independently logged-in players can join, see each other, accept the same NPC quest, interact with one server-owned resource/enemy, receive server-validated rewards, disconnect and reconnect with those rewards intact.
+```text
+PASS account flow: register, create character, resume session and password sign-in
+PASS guest reconnect: same identity, saved position, single active session and inventory
+PASS multiplayer smoke: shared combat, quest, equipment and rejected forged gathering/crafting
+```
 
-## Supporting design documents
+The Android workflow is the full gate: `bun run check`, `bun test`, Blender generation, `bun tools/smoke-server.ts`, `bun run build`, and `assembleDebug`. The Blender workflow is the narrower asset job described above. A green Actions run shows that those commands passed on the runner. It does not record a frame rate on a phone.
 
-- [Multiplayer Server](docs/MULTIPLAYER_SERVER.md)
-- [Authoritative Combat](docs/AUTHORITATIVE_COMBAT.md)
-- [Inventory and Loot](docs/INVENTORY_LOOT.md)
-- [Wolf Hunt Quest](docs/WOLF_HUNT_QUEST.md)
-- [Character Progression](docs/CHARACTER_PROGRESSION.md)
-- [Equipment and Combat Stats](docs/EQUIPMENT_COMBAT.md)
-- [Gathering and Crafting](docs/GATHERING_CRAFTING.md)
-- [Resource Guidance and Android Crafting UX](docs/RESOURCE_GUIDANCE.md)
-- [Android Game Menu and HUD](docs/ANDROID_GAME_MENU.md)
-- [Moonleaf Foraging and Healing Tonics](docs/MOONLEAF_TONICS.md)
-- [Authoritative Building Collision](docs/BUILDING_COLLISION.md)
-- [Guest Reconnection and Session Recovery](docs/RECONNECTION.md)
-- [World Streaming](docs/WORLD_STREAMING.md)
-- [Terrain and Biomes](docs/TERRAIN_BIOMES.md)
-- [World Landmarks / Content](docs/WORLD_CONTENT.md)
-- [Settlements and Roads](docs/SETTLEMENTS_ROADS.md)
-- [World Atlas](docs/WORLD_ATLAS.md)
+## Further reading
+
+The notes in `docs/` go into each system as it was added. Where a note still names an older protocol version, an earlier four-race roster, or a system as absent, this README and the source are the current description. Protocol 11 is the live version in `apps/server/src/protocol.ts`.
+
+**Play**
+
+- [Character creation](docs/CHARACTER_CREATION.md)
+- [Eight-race lineup](docs/RACE_LINEUP_OVERHAUL.md)
+- [Race models and class abilities](docs/RACE_MODELS_AND_CLASSES.md)
+- [Character progression](docs/CHARACTER_PROGRESSION.md)
+- [Inventory and loot](docs/INVENTORY_LOOT.md)
+- [Wolf Hunt](docs/WOLF_HUNT_QUEST.md)
+- [Gathering and crafting](docs/GATHERING_CRAFTING.md)
+- [Moonleaf and tonics](docs/MOONLEAF_TONICS.md)
+- [Equipment and combat stats](docs/EQUIPMENT_COMBAT.md)
+- [Authoritative combat](docs/AUTHORITATIVE_COMBAT.md)
+- [Atomic wolf rewards](docs/ATOMIC_WOLF_REWARDS.md)
+- [Resource guidance](docs/RESOURCE_GUIDANCE.md)
+
+**World and client**
+
+- [World streaming](docs/WORLD_STREAMING.md)
+- [Terrain and biomes](docs/TERRAIN_BIOMES.md)
+- [World content](docs/WORLD_CONTENT.md)
+- [Settlements and roads](docs/SETTLEMENTS_ROADS.md)
+- [World atlas](docs/WORLD_ATLAS.md)
+- [Building collision](docs/BUILDING_COLLISION.md)
+- [Android game menu](docs/ANDROID_GAME_MENU.md)
+- [Visual rebuild](docs/VISUAL_REBUILD_V1.md)
+- [Graphical rebuild pass 2](docs/GRAPHICAL_REBUILD_PASS_2.md)
+
+**Server, art, and device checks**
+
+- [Multiplayer server](docs/MULTIPLAYER_SERVER.md)
+- [Reconnection](docs/RECONNECTION.md)
+- [Blender pipeline](docs/assets/BLENDER_PIPELINE.md)
+- [GLB integration](docs/assets/GLB_INTEGRATION.md)
+- [Asset production plan](docs/assets/PRODUCTION_PLAN.md)
 - [Android QA](docs/ANDROID_QA.md)
-- [Local Combat Slice](docs/ANDROID_COMBAT_SLICE.md)
-- [Blender Generation Pipeline](docs/assets/BLENDER_PIPELINE.md)
-- [GLB Runtime Integration](docs/assets/GLB_INTEGRATION.md)
-- [Asset Production Plan](docs/assets/PRODUCTION_PLAN.md)
+- [Android combat slice](docs/ANDROID_COMBAT_SLICE.md)
 
----
-
-**Maintainer note:** Always update this README when a gameplay system changes. Mark real implementation separately from proposed design, keep test instructions executable, and check the latest GitHub Actions run before claiming an APK or server feature is release-ready.
+When a gameplay rule changes, update this README in the same change so the commands, ports, and protocol version stay tied to the source.
