@@ -43,6 +43,18 @@ jobs:
           python3 tools/blender/validate_glb.py apps/client/public/assets
           blender --background --factory-startup --python-exit-code 1 --python tools/blender/generate_races.py -- --out apps/client/public/assets
           python3 tools/blender/validate_races.py apps/client/public/assets
+      - name: Render actual eight-race Blender lineup previews
+        run: |
+          blender --background --factory-startup --python-exit-code 1 --python tools/blender/render_lineup.py -- --assets apps/client/public/assets --out build/lineup-previews
+          test -s build/lineup-previews/lineup-radiant-accord.png
+          test -s build/lineup-previews/lineup-umbral-dominion.png
+      - name: Upload real model preview gallery
+        uses: actions/upload-artifact@v4
+        with:
+          name: realms-unwritten-actual-race-lineups
+          path: build/lineup-previews/*.png
+          if-no-files-found: error
+          retention-days: 14
       - name: Run server WebSocket smoke test
         run: bun tools/smoke-server.ts
       - name: Build web client
