@@ -27,7 +27,7 @@ export const assetCatalog: readonly AssetDefinition[] = [
   { id: "building/cottage-01", category: "building", stage: "blockout", lod0Triangles: 3000, textureMaxPx: 1024, variants: 3, gameplayCollision: true },
   { id: "character/adventurer-01", category: "character", stage: "blockout", lod0Triangles: 7500, textureMaxPx: 1024, variants: 4, gameplayCollision: true },
   // CI-generated original character GLBs; high-level target budgets, not measured counts.
-  ...(["sunborne","thornkin","ashforged","veilkin"] as const).flatMap(race=>
+  ...(["sunborne","thornkin","stonehearth","aetheri","ashforged","hornwarden","hollowborn","veilkin"] as const).flatMap(race=>
     (["vanguard","spellweaver","shadeblade"] as const).map(characterClass=>({
       id:"character/"+race+"-"+characterClass,
       category:"character" as const,

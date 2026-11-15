@@ -309,6 +309,10 @@ The visible world additionally contains **two different faction architectural en
 
 **Scope disclaimer:** This is a substantial graphical rebuild, not a complete production art overhaul. Authored high-fidelity faces, hair physics, complex clothing, large faction homelands, hand-authored dungeons, full UI/icon/audio art, and physical Android screenshot/FPS approval remain open. See [Graphical Rebuild Pass 2](docs/GRAPHICAL_REBUILD_PASS_2.md).
 
+### Eight-race playable lineup
+
+Four original races per faction now produce 24 race/class GLBs with contrasting bodies, facial features and armor silhouettes. The creator includes a tap-selectable 3D roster. Existing character data migrates safely. See [Lineup Overhaul](docs/RACE_LINEUP_OVERHAUL.md).
+
 ### Guest persistence
 
 - SQLite via Bun's `bun:sqlite`.
