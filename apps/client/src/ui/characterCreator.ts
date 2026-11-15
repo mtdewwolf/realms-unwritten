@@ -1,5 +1,6 @@
 import {FACTIONS,RACES,CLASSES,type CharacterCreation,type FactionId,type RaceId,type ClassId,type CharacterAppearance} from "../../../shared/src/characterCatalog";
 import {RacePreview} from "./racePreview";
+import {RaceLineup} from "./raceLineup";
 
 export class CharacterCreator{
  readonly element:HTMLElement;
@@ -8,6 +9,7 @@ export class CharacterCreator{
  private characterClass:ClassId="vanguard";
  private appearance:CharacterAppearance={frame:"lean",skinTone:0,hairStyle:0,hairColor:0,marking:0};
  private readonly preview:RacePreview;
+ private readonly lineup:RaceLineup;
  private readonly choices:HTMLElement;
  private readonly display:HTMLElement;
  private readonly message:HTMLElement;
@@ -15,13 +17,14 @@ export class CharacterCreator{
  constructor(host:HTMLElement,private readonly submit:(choice:CharacterCreation)=>boolean){
   const el=document.createElement("section");
   el.id="character-creator";el.hidden=true;el.setAttribute("aria-label","Create your character");
-  el.innerHTML='<div class="creator-header"><strong>REALMS UNWRITTEN</strong><small>FORGE YOUR LEGEND</small></div><h2>Choose your allegiance</h2><p class="creator-intro">The Radiant Accord stands for protection. The Umbral Dominion seeks power through darkness. Your character can challenge the beliefs of their faction.</p><div id="creator-factions"></div><div class="creator-preview"><div id="creator-portrait" aria-label="Live 3D character preview"></div><div id="creator-display"></div></div><div id="creator-rotate"><button type="button" id="creator-left">↶</button><span>Drag to rotate</span><button type="button" id="creator-right">↷</button></div><h3>Heritage</h3><div id="creator-races"></div><h3>Calling</h3><div id="creator-classes"></div><h3>Appearance</h3><div id="creator-appearance"></div><label for="creator-name">Character name</label><input id="creator-name" maxlength="20" autocomplete="off" placeholder="3–20 characters"/><p class="creator-message" role="status"></p><button type="button" id="creator-submit">ENTER THE REALM</button><p class="creator-footnote">Faction, race and class are permanent on this guest character. Appearance is saved on Bun. Faction homelands and talents are future milestones.</p>';
+  el.innerHTML='<div class="creator-header"><strong>REALMS UNWRITTEN</strong><small>FORGE YOUR LEGEND</small></div><h2>Choose your allegiance</h2><p class="creator-intro">The Radiant Accord stands for protection. The Umbral Dominion seeks power through darkness. Your character can challenge the beliefs of their faction.</p><div id="creator-factions"></div><h3>Choose your bloodline</h3><div id="creator-lineup"></div><div class="creator-preview"><div id="creator-portrait" aria-label="Live 3D character preview"></div><div id="creator-display"></div></div><div id="creator-rotate"><button type="button" id="creator-left">↶</button><span>Drag to rotate</span><button type="button" id="creator-right">↷</button></div><h3>Heritage</h3><div id="creator-races"></div><h3>Calling</h3><div id="creator-classes"></div><h3>Appearance</h3><div id="creator-appearance"></div><label for="creator-name">Character name</label><input id="creator-name" maxlength="20" autocomplete="off" placeholder="3–20 characters"/><p class="creator-message" role="status"></p><button type="button" id="creator-submit">ENTER THE REALM</button><p class="creator-footnote">Faction, race and class are permanent on this guest character. Appearance is saved on Bun. Faction homelands and talents are future milestones.</p>';
   host.appendChild(el);this.element=el;
   this.choices=el.querySelector<HTMLElement>("#creator-factions")!;
   this.display=el.querySelector<HTMLElement>("#creator-display")!;
   this.message=el.querySelector<HTMLElement>(".creator-message")!;
   this.name=el.querySelector<HTMLInputElement>("#creator-name")!;
   this.preview=new RacePreview(el.querySelector<HTMLElement>("#creator-portrait")!);
+  this.lineup=new RaceLineup(el.querySelector<HTMLElement>("#creator-lineup")!,race=>{this.race=race;this.render();});
   el.querySelector("#creator-left")!.addEventListener("click",()=>this.preview.rotate(-Math.PI/6));
   el.querySelector("#creator-right")!.addEventListener("click",()=>this.preview.rotate(Math.PI/6));
   el.querySelector<HTMLButtonElement>("#creator-submit")!.addEventListener("click",()=>{
@@ -90,6 +93,7 @@ export class CharacterCreator{
      label.appendChild(select);appearancePanel.appendChild(label);
    }
    this.preview.update(this.race,this.characterClass,this.appearance);
+   this.lineup.update(this.faction,this.characterClass,this.race);
    this.display.textContent=RACES[this.race].name+" · "+CLASSES[this.characterClass].name;
    this.element.style.setProperty("--creator-accent",RACES[this.race].color);
  }
