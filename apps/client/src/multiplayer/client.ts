@@ -7,6 +7,7 @@ import type {InventoryState,RewardEvent} from "../ui/inventory";
 import type {QuestState,QuestResult} from "../ui/quests";
 import type {ProgressionState} from "../ui/character";
 import {HELLO_TIMEOUT_MS,MAX_RECONNECT_ATTEMPTS,reconnectDelay,shouldReconnect} from "./reconnectPolicy";
+import {PredictedMotion} from "./prediction";
 import {type CharacterCreation,type CharacterIdentity} from "../../../shared/src/characterCatalog";
 
 interface PlayerState{id:string;name:string;x:number;z:number;heading:number;character?:CharacterIdentity}
@@ -38,6 +39,7 @@ export class MultiplayerClient {
   private retries=0;
   private retryTimer:ReturnType<typeof setTimeout>|null=null;
   private helloTimer:ReturnType<typeof setTimeout>|null=null;
+  private readonly motion=new PredictedMotion();
   constructor(private readonly scene:THREE.Scene,private readonly avatar:THREE.Group,private readonly status:(s:string)=>void,private readonly onCombat:(vitals:ServerVitals,wolf:ServerWolf|null)=>void,private readonly onActionResult:(result:CombatActionResult)=>void,private readonly onOffline:()=>void,private readonly onInventory:(state:InventoryState)=>void,private readonly onReward:(event:RewardEvent)=>void,private readonly onQuest:(quest:QuestState)=>void,private readonly onQuestResult:(result:QuestResult)=>void,private readonly onProgression:(state:ProgressionState)=>void,private readonly onResource:(result:{type:"resource_result";action:"gather"|"craft";ok:boolean;nodeId?:string;retryAfterMs?:number})=>void,private readonly onCreationRequired:()=>void,private readonly onIdentity:(identity:CharacterIdentity)=>void,private readonly onAbility:(result:ClassAbilityResult)=>void,private readonly onAuthRequired:()=>void,private readonly onAuthReady:(hasCharacter:boolean)=>void,private readonly onAuthError:(message:string)=>void){}
   get connected():boolean{return this.online&&this.socket?.readyState===WebSocket.OPEN;}
   connect(url:string,mode:"account"|"guest"="account",freshAuth=false):void{
@@ -107,6 +109,7 @@ export class MultiplayerClient {
         if(this.mode==="account")saveAccountToken(message.token);else saveToken(message.token);
         this.online=true;
         this.onIdentity(message.character);
+        this.motion.reset(message.player.x,message.player.z,performance.now());
         this.avatar.position.x=message.player.x;this.avatar.position.z=message.player.z;
         this.status("Online · authoritative movement connected");return;
       }
@@ -123,11 +126,9 @@ export class MultiplayerClient {
       if(message.type==="snapshot" && this.online){
         this.onCombat(message.vitals,message.wolf);
         const {you,others}=message;
-        // Smooth small reconciliation errors; snap only after larger divergence.
-        const delta=Math.hypot(this.avatar.position.x-you.x,this.avatar.position.z-you.z);
-        const blend=delta>8?1:.28;
-        this.avatar.position.x+=(you.x-this.avatar.position.x)*blend;
-        this.avatar.position.z+=(you.z-this.avatar.position.z)*blend;
+        // Reconcile against where we were when the server simulated this pose.
+        // The mesh keeps predicting; update() eases in only real disagreement.
+        this.motion.reconcile(performance.now(),you.x,you.z,message.ack);
         const visible=new Set<string>();
         for(const other of others){
           if(other.id===this.id)continue;
@@ -234,11 +235,25 @@ export class MultiplayerClient {
   }
   sendMovement(input:MovementInput,now:number):void{
     if(!this.connected||now-this.lastSend<50)return;
-    const norm=Math.max(1,Math.hypot(input.dx,input.dz));
-    this.socket!.send(JSON.stringify({type:"input",seq:++this.sequence,dx:input.dx/norm,dz:input.dz/norm}));
+    if(!Number.isFinite(input.dx)||!Number.isFinite(input.dz))return;
+    this.socket!.send(JSON.stringify({type:"input",seq:++this.sequence,dx:input.dx,dz:input.dz}));
+    this.motion.noteInput(this.sequence,now);
     this.lastSend=now;
   }
+  /** Integrate the same command the server is holding, every frame. */
+  predictLocal(dx:number,dz:number,dt:number,now:number):void{
+    if(!this.connected)return;
+    this.motion.predict(dx,dz,dt,now);
+  }
+  /** Server-time pose used for gather range, not the latency-leading mesh. */
+  authoritativePosition(now:number):{x:number;z:number}{
+    return this.motion.serverPose(now);
+  }
   update(dt:number,groundHeightAt:(x:number,z:number)=>number):void{
+    if(this.online){
+      this.motion.smooth(dt);
+      this.motion.writeRender(this.avatar.position);
+    }
     for(const entry of this.others.values()){
       const p=entry.target;
       const smoothing=Math.min(1,dt*12);
