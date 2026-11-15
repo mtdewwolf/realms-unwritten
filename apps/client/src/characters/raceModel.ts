@@ -4,7 +4,11 @@ export interface RaceCharacter{root:THREE.Group;update:(time:number,moving:boole
 const SKINS:Record<RaceId,readonly number[]>={
  sunborne:[0xebc69e,0xd8a97e,0xb7805c,0x8e5940],
  thornkin:[0xb0c38f,0x8fa87c,0x6e9273,0x4b715a],
- ashforged:[0xad7a6c,0x996458,0x785250,0x614546],
+ stonehearth:[0xdcb08a,0xb58b69,0x997054,0x75513c],
+ aetheri:[0xd9c9dd,0xb4a9d3,0x938ec1,0x706f9b],
+ ashforged:[0x7da067,0x628450,0x496c40,0x35543b],
+ hornwarden:[0xbc997d,0xa38369,0x846a58,0x6d5649],
+ hollowborn:[0xb3b7a9,0x8f988e,0x757e78,0x5f6b64],
  veilkin:[0xb0a6ca,0x908cb7,0x716b9d,0x524c75]
 };
 const HAIR=[0x352d30,0xd0a673,0xe6dfc2,0x683e3c,0x8a80bb];
@@ -25,7 +29,7 @@ export function createRaceCharacter(identity:Pick<CharacterIdentity,"race"|"char
  const width=sturdy?1.13:1;
  const torso=box(root,.78*width,.89,.47,armor,0,1.28,0);
  box(root,.81*width,.15,.5,leather,0,.88,0);
- const head=orb(root,identity.race==="ashforged"?.32:.29,skin,0,2,0);
+ const head=orb(root,identity.race==="ashforged"||identity.race==="hornwarden"?.37:.29,skin,0,2,0);
  head.scale.set(1,1.06,.9);
  // Each race has an unambiguous silhouette from any viewing angle.
  if(identity.race==="sunborne"){
@@ -39,12 +43,29 @@ export function createRaceCharacter(identity:Pick<CharacterIdentity,"race"|"char
    const antler=mesh(new THREE.ConeGeometry(.08,.42,5),leather,root,s*.21,2.48,-.06);
    antler.rotation.z=s*.4;
   }
+ }else if(identity.race==="stonehearth"){
+   for(const s of [-1,1])box(root,.22,.35,.19,hair,s*.16,1.85,-.15);
+   box(root,.36,.21,.25,metal,0,2.3,-.05);
+ }else if(identity.race==="aetheri"){
+   for(const s of [-1,1]){
+     const ear=mesh(new THREE.ConeGeometry(.12,.49,5),skin,root,s*.35,2.15,0);
+     ear.rotation.z=-s*.95;
+   }
+   orb(root,.14,glow,0,2.42,-.19);
  }else if(identity.race==="ashforged"){
   for(const s of [-1,1]){
    const horn=mesh(new THREE.ConeGeometry(.14,.52,6),metal,root,s*.24,2.42,-.05);
    horn.rotation.z=-s*.35;
    box(root,.25,.16,.25,metal,s*.39,1.51,0);
   }
+ }else if(identity.race==="hornwarden"){
+   for(const s of [-1,1]){
+     const horn=mesh(new THREE.ConeGeometry(.23,.77,7),leather,root,s*.48,2.38,0);
+     horn.rotation.z=-s*.65;
+   }
+ }else if(identity.race==="hollowborn"){
+   box(root,.6,.27,.32,boots,0,1.8,-.05);
+   for(const s of [-1,1])orb(root,.11,glow,s*.16,2.05,-.26);
  }else{
   for(const s of [-1,1]){
    const ear=mesh(new THREE.ConeGeometry(.1,.48,4),skin,root,s*.38,2.04,0);
@@ -100,7 +121,12 @@ export function createRaceCharacter(identity:Pick<CharacterIdentity,"race"|"char
     box(arm,.25,.09,.23,leather,0,-.78,.13);
    }
  }
- root.scale.setScalar(identity.race==="ashforged"?1.08:identity.race==="thornkin"?1.04:identity.race==="veilkin"?.96:1);
+ const proportions:Record<RaceId,[number,number]>={
+  sunborne:[1.10,1.10],thornkin:[.95,1.14],stonehearth:[1.32,.76],aetheri:[.86,1.15],
+  ashforged:[1.42,1.07],hornwarden:[1.47,1.38],hollowborn:[.78,.95],veilkin:[.89,1.06]
+ };
+ const [broad,tall]=proportions[identity.race];
+ root.scale.set(broad,tall,broad);
  return {
   root,
   update(time,moving,attacking){
