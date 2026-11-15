@@ -206,3 +206,13 @@
 #realm-login-status{font:12px/1.5 system-ui,sans-serif;color:#e2c48d;min-height:24px;margin:11px 0}
 #realm-title .realm-disclaimer{font:10px/1.4 system-ui,sans-serif;color:#a7b6b4;max-width:500px;margin:13px auto}
 @media(max-width:500px){#realm-title .realm-auth-card{padding:13px}#realm-title .realm-title-inner{padding-top:max(10px,env(safe-area-inset-top))}#realm-title h1{font-size:37px}}
+
+/* Faction roster: one 3D canvas with four races, touch-friendly at phone widths. */
+#character-creator #creator-lineup{position:relative;max-width:850px;margin:10px auto 16px;border:2px solid #c49a58;border-radius:12px;overflow:hidden;background:linear-gradient(#243c3b,#171f24);box-shadow:inset 0 0 24px #090e14,0 7px 24px #0008}
+#character-creator #creator-lineup canvas{display:block;width:100%;height:auto;aspect-ratio:680/284;touch-action:manipulation;cursor:pointer}
+#character-creator #creator-races{grid-template-columns:repeat(4,minmax(0,1fr));max-width:850px;margin:0 auto}
+#character-creator #creator-races .creator-choice{min-width:0;min-height:80px}
+#character-creator #creator-races .creator-choice strong{font-family:Georgia,serif;font-size:clamp(12px,2vw,17px)}
+#character-creator #creator-races .creator-choice small{font-size:10px}
+#character-creator .creator-preview{justify-content:center;max-width:850px;margin-left:auto;margin-right:auto}
+@media(max-width:540px){#character-creator #creator-races{grid-template-columns:repeat(2,minmax(0,1fr))}#character-creator #creator-lineup{margin:8px -8px 12px}}
