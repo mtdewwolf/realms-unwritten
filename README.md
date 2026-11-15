@@ -14,10 +14,11 @@ Today’s build is one Bun process and one SQLite file: accounts, one shared wol
 4. [Quick start](#quick-start)
 5. [Configuration](#configuration)
 6. [Deploy the realm server on Railway](#deploy-the-realm-server-on-railway)
-7. [Android app](#android-app)
-8. [Art pipeline](#art-pipeline)
-9. [Testing and CI](#testing-and-ci)
-10. [Further reading](#further-reading)
+7. [Ideas board](#ideas-board)
+8. [Android app](#android-app)
+9. [Art pipeline](#art-pipeline)
+10. [Testing and CI](#testing-and-ci)
+11. [Further reading](#further-reading)
 
 ## Feature overview
 
@@ -34,6 +35,7 @@ The client is a Three.js scene in a Vite app, wrapped for Android with Capacitor
 | Combat | One shared starter wolf. Attack, dodge, and three class abilities are server-checked. |
 | Movement | The server simulates at 20 Hz and snapshots at 10 Hz. The client predicts with the same movement step. |
 | World | A 16,384 m square streamed in 64 m chunks. Discoveries and the atlas stay on the device. |
+| Ideas board | Private kanban in `apps/kanban`, separate from the realm server, with its own SQLite file. |
 
 ### Accounts
 
@@ -123,6 +125,9 @@ In the world, **☰ MENU** opens Map, Backpack, Quests, Character, and Multiplay
 │   ├── src/quests.ts
 │   ├── src/resources.ts
 │   └── railway.json             # Health check path only
+├── apps/kanban/                 # @realms/kanban — private ideas board
+│   ├── src/index.ts             # HTTP API, session cookie, SQLite shutdown
+│   └── railway.json             # Railpack, /health, one replica, /data volume
 ├── apps/shared/src/             # Faction, race, and class catalog
 ├── tools/blender/               # Headless GLB generators and validators
 ├── tools/smoke-server.ts        # Live two-client WebSocket smoke test
@@ -133,15 +138,16 @@ In the world, **☰ MENU** opens Map, Backpack, Quests, Character, and Multiplay
     └── blender-assets.yml
 ```
 
-Root `package.json` workspaces are `apps/*` and `packages/*`. The packages that exist are `@realms/client` and `@realms/server`. `apps/shared` has no `package.json`; client and server import it by relative path. There is no `packages/` directory.
+Root `package.json` workspaces are `apps/*` and `packages/*`. The packages that exist are `@realms/client`, `@realms/server`, and `@realms/kanban`. `apps/shared` has no `package.json`; client and server import it by relative path. There is no `packages/` directory.
 
 | Script | What it runs |
 | --- | --- |
 | `bun run dev` | Server and client together (`bun run --parallel`) |
 | `bun run dev:server` | `bun --watch src/index.ts` in `apps/server` |
 | `bun run dev:client` | `vite --host 0.0.0.0` in `apps/client` |
+| `bun run dev:kanban` | `bun --watch src/index.ts` in `apps/kanban` (http://localhost:3002) |
 | `bun run build` | Client typecheck and Vite build (`apps/client/dist`) |
-| `bun run check` | `tsc --noEmit` for client and server |
+| `bun run check` | `tsc --noEmit` for client, server, and kanban |
 | `bun test` | Every `test/*.test.ts` file |
 
 Stack versions in the manifests: TypeScript 5.9.x, Three.js 0.181.x, Vite 7.x, Capacitor 7.x. The Android workflow installs Bun 1.3.3 and Temurin JDK 21.
@@ -170,6 +176,8 @@ bun run dev:client
 ```
 
 `bun run dev` starts both. The server listens on port **3001** and prints `Realms Unwritten server on … (WebSocket: /ws)`. Vite does not set a port in `apps/client/vite.config.ts`, so it uses Vite’s default **5173** and prints another port if 5173 is taken. Open the URL Vite prints (usually `http://localhost:5173`).
+
+The ideas board is a separate process. `bun run dev:kanban` serves it at http://localhost:3002. See [apps/kanban/README.md](apps/kanban/README.md).
 
 On the title screen, set **Realm server** to:
 
@@ -233,6 +241,19 @@ wss://<your-domain>/ws
 A redeploy sends SIGTERM. The handler saves positions, checkpoints the WAL into the main database file, closes it, and stops the HTTP server.
 
 Accounts on that host are the same prototype: Argon2id hashes and 30-day sessions, without email recovery or a global rate limit beyond the per-socket cap of 40 messages per second.
+
+## Ideas board
+
+`apps/kanban` (`@realms/kanban`) is a private kanban for game ideas. It does not share the world database or protocol 11.
+
+In the same Railway project, add another service from this repo with root directory `apps/kanban`. Railpack’s install step is `bun install --frozen-lockfile`. There is no `build` script. The start command is `bun src/index.ts`. `apps/kanban/railway.json` sets the health check to `GET /health`, one replica, and a required volume at `/data`. Use a different volume from the realm server.
+
+```text
+KANBAN_DB_PATH=/data/kanban.sqlite
+KANBAN_PASSWORD=<shared password>
+```
+
+Leave `NODE_ENV=production` (Railpack sets it). Do not set `PORT`. The process binds `0.0.0.0` and uses Railway’s `PORT`. If `KANBAN_PASSWORD` is unset while `NODE_ENV=production`, the process exits. Locally, an unset password starts the board open and prints a warning. A redeploy sends SIGTERM; the process checkpoints the WAL and closes the database before exit. Full steps are in [apps/kanban/README.md](apps/kanban/README.md).
 
 ## Android app
 
@@ -332,7 +353,7 @@ bun run check
 bun test
 ```
 
-`bun run check` is `tsc --noEmit` for `apps/client/tsconfig.json` and `apps/server/tsconfig.json`. `bun test` runs the files in `test/`, including accounts, character creation, the eight-race catalog, combat, gathering, crafting, quests, movement prediction, a live gather against a spawned server, and SIGTERM checkpointing.
+`bun run check` is `tsc --noEmit` for `apps/client/tsconfig.json`, `apps/server/tsconfig.json`, and `apps/kanban/tsconfig.json`. `bun test` runs the files in `test/`, including accounts, character creation, the eight-race catalog, combat, gathering, crafting, quests, movement prediction, a live gather against a spawned server, SIGTERM checkpointing, and the ideas board (`test/kanban.test.ts`).
 
 `bun run build` typechecks the client again and writes `apps/client/dist`. It succeeds without GLBs; the procedural fallbacks cover that case.
 

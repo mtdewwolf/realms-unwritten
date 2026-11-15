@@ -4,5 +4,8 @@ apps/client/android/
 *.db
 *.db-shm
 *.db-wal
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
 .env
 .DS_Store
