@@ -68,6 +68,11 @@ def render(faction,characters,assets,out):
  bpy.context.scene.camera=camera
  scene=bpy.context.scene
  scene.render.engine="CYCLES";scene.cycles.samples=12
+ # Ubuntu's Blender is compiled without OpenImageDenoiser. The lighting and geometry
+ # can still be rendered correctly using un-denoised CPU cycles samples.
+ if hasattr(scene.cycles,"use_denoising"):scene.cycles.use_denoising=False
+ for layer in scene.view_layers:
+  if hasattr(layer.cycles,"use_denoising"):layer.cycles.use_denoising=False
  scene.render.resolution_x=1280;scene.render.resolution_y=640;scene.render.resolution_percentage=100
  scene.render.image_settings.file_format="PNG"
  scene.render.film_transparent=False
