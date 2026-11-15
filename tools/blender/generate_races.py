@@ -117,21 +117,21 @@ def heroic_detail(rig,race,profession,palette,skin,hair,armor,leather,metal,glow
  # Large, visible facial geometry: chin, nose, eyes, brow and lip.
  head_depth=.51 if race in ("ashforged","hornwarden") else .43
  facew=.54 if race in ("ashforged","hornwarden") else .45
- piece(rig,"Jaw sculpt","head",(0,-.055,1.91),(facew,head_depth,.33),skin,"sphere")
- piece(rig,"Nose bridge","head",(0,-.24,2.04),(.16,.18,.25),skin,"sphere")
- piece(rig,"Nose tip","head",(0,-.34,1.99),(.18,.14,.11),skin,"sphere")
+ piece(rig,"Jaw sculpt","head",(0,-.055,1.91),(facew*.75,head_depth*.70,.23),skin,"sphere")
+ piece(rig,"Nose bridge","head",(0,-.24,2.04),(.095,.12,.18),skin,"sphere")
+ piece(rig,"Nose tip","head",(0,-.34,1.99),(.115,.095,.09),skin,"sphere")
  for side,s in (("L",-1),("R",1)):
-  piece(rig,"Eye socket "+side,"head",(s*.135,-.244,2.12),(.155,.085,.12),dark,"sphere")
-  piece(rig,"Eye iris "+side,"head",(s*.135,-.309,2.12),(.075,.06,.08),eye,"sphere")
-  brow=piece(rig,"Expression brow "+side,"head",(s*.14,-.282,2.22),(.23,.075,.09),hair)
+  piece(rig,"Eye socket "+side,"head",(s*.135,-.244,2.12),(.13,.055,.08),dark,"sphere")
+  piece(rig,"Eye iris "+side,"head",(s*.135,-.309,2.12),(.075,.055,.075),eye,"sphere")
+  brow=piece(rig,"Expression brow "+side,"head",(s*.14,-.282,2.22),(.18,.055,.07),hair)
   brow.rotation_euler[1]=s*.09
-  piece(rig,"Cheek "+side,"head",(s*.25,-.165,1.94),(.23,.23,.16),skin,"sphere")
+  piece(rig,"Cheek "+side,"head",(s*.25,-.165,1.94),(.12,.12,.09),skin,"sphere")
  piece(rig,"Mouth line","head",(0,-.291,1.86),(.19,.045,.045),dark)
  if race=="stonehearth":
-  piece(rig,"Stout deep beard","head",(0,-.16,1.76),(.53,.40,.59),hair,"sphere")
+  piece(rig,"Stout deep beard","head",(0,-.16,1.76),(.42,.25,.40),hair,"sphere")
   for s in (-1,1):
-   braid=piece(rig,"Tied beard braid %s"%s,"head",(s*.21,-.36,1.49),(.17,.18,.47),hair,"cylinder")
-   piece(rig,"Braided gold bead %s"%s,"head",(s*.21,-.36,1.3),(.22,.22,.09),gold,"cylinder")
+   braid=piece(rig,"Tied beard braid %s"%s,"head",(s*.21,-.36,1.49),(.12,.12,.34),hair,"cylinder")
+   piece(rig,"Braided gold bead %s"%s,"head",(s*.21,-.36,1.3),(.15,.15,.075),gold,"cylinder")
   piece(rig,"Forge goggles bridge","head",(0,-.3,2.31),(.5,.12,.14),bronze)
   for s in (-1,1):
    piece(rig,"Forge goggle lens %s"%s,"head",(s*.18,-.34,2.31),(.26,.09,.22),gold,"cylinder")
@@ -140,9 +140,9 @@ def heroic_detail(rig,race,profession,palette,skin,hair,armor,leather,metal,glow
   for s in (-1,1):
    piece(rig,"Lower tusk %s"%s,"head",(s*.21,-.36,1.84),(.15,.13,.31),pearl,"cone")
    piece(rig,"Iron shoulder spike %s"%s,"spine",(s*.68,-.01,1.89),(.36,.36,.66),steel,"cone")
-  piece(rig,"Heavy jaw","head",(0,-.26,1.85),(.57,.37,.28),skin,"sphere")
+  piece(rig,"Heavy jaw","head",(0,-.26,1.85),(.47,.27,.21),skin,"sphere")
  elif race=="hornwarden":
-  piece(rig,"Broad muzzle","head",(0,-.29,1.97),(.66,.39,.32),skin,"sphere")
+  piece(rig,"Broad muzzle","head",(0,-.29,1.97),(.49,.27,.20),skin,"sphere")
   for s in (-1,1):
    horn=piece(rig,"Great curved horn %s"%s,"head",(s*.49,0,2.39),(.28,.25,.88),pearl,"cone")
    horn.rotation_euler[1]=s*.55
@@ -179,13 +179,13 @@ def heroic_detail(rig,race,profession,palette,skin,hair,armor,leather,metal,glow
   piece(rig,"Sun herald crest","spine",(0,-.32,1.46),(.34,.09,.34),gold,"sphere")
  # A strong chest silhouette and thick, visually legible class gear.
  for s in (-1,1):
-  pauldron=piece(rig,"RU_HEROIC_PAULDRON_%s"%s,"spine",(s*.59,-.05,1.72),
-   (.65,.71,.36),metal if profession=="vanguard" else armor,"sphere")
-  piece(rig,"Shoulder edge %s"%s,"spine",(s*.67,-.17,1.64),(.50,.37,.14),trim)
+  pauldron=piece(rig,"RU_HEROIC_PAULDRON_%s"%s,"spine",(s*.55,-.06,1.71),
+   (.35,.40,.28),metal if profession=="vanguard" else armor,"sphere")
+  piece(rig,"Shoulder edge %s"%s,"spine",(s*.67,-.17,1.64),(.28,.29,.13),trim)
   piece(rig,"Bracer cuff %s"%s,"arm_"+("L" if s==-1 else "R"),
     (s*.54,-.08,1.11),(.37,.42,.24),bronze if profession=="shadeblade" else metal)
   piece(rig,"Boot armor %s"%s,"leg_"+("L" if s==-1 else "R"),
-    (s*.22,-.11,.25),(.39,.46,.35),leather,"sphere")
+    (s*.22,-.11,.25),(.33,.25,.40),leather))
   piece(rig,"Belt pouch %s"%s,"hips",(s*.39,-.22,.96),(.24,.2,.33),leather)
   piece(rig,"Pouch clasp %s"%s,"hips",(s*.40,-.35,.98),(.11,.05,.10),gold)
  piece(rig,"Chest emblem","spine",(0,-.285,1.49),(.37,.09,.42),trim,"sphere")
@@ -195,8 +195,8 @@ def heroic_detail(rig,race,profession,palette,skin,hair,armor,leather,metal,glow
   for s in (-1,1):
    piece(rig,"Shield crest rivet %s"%s,"arm_L",(s*.24,-.37,1.22),(.10,.09,.13),gold,"sphere")
    piece(rig,"Cuirass trim %s"%s,"spine",(s*.32,-.38,1.4),(.07,.09,.50),gold)
-  piece(rig,"Tower shield face","arm_L",(-.68,-.38,1.28),(.88,.16,1.02),steel)
-  piece(rig,"Shield boss","arm_L",(-.68,-.50,1.28),(.41,.12,.41),gold,"sphere")
+  piece(rig,"Tower shield face","arm_L",(-.68,-.38,1.28),(.73,.16,.89),steel)
+  piece(rig,"Shield boss","arm_L",(-.68,-.50,1.28),(.18,.11,.18),gold,"sphere")
   blade=piece(rig,"Great sword tapered edge","arm_R",(.66,-.05,.59),(.25,.14,1.3),steel,"cone")
   blade.rotation_euler[0]=.12
  elif profession=="spellweaver":
@@ -207,7 +207,7 @@ def heroic_detail(rig,race,profession,palette,skin,hair,armor,leather,metal,glow
    piece(rig,"Crystal pauldron %s"%s,"spine",(s*.63,-.06,1.9),(.34,.35,.51),glow,"cone")
   piece(rig,"Rune staff tip","arm_R",(.63,-.14,1.92),(.47,.43,.54),glow,"sphere")
  elif profession=="shadeblade":
-  piece(rig,"Hooded mantle","spine",(0,.26,1.54),(.92,.16,.59),cloak)
+  piece(rig,"Hooded mantle","spine",(0,.26,1.54),(.72,.16,.47),cloak)
   piece(rig,"Assassin scarf","head",(0,-.23,1.87),(.48,.21,.22),cloak)
   for s in (-1,1):
    piece(rig,"Swept blade tip %s"%s,"arm_"+("L" if s==-1 else "R"),
@@ -227,10 +227,10 @@ def hero(out,race,profession):
  width=PROPORTIONS[race][1]
  piece(rig,"Coat","spine",(0,0,1.37),(.72*width,.50,.82),armor)
  piece(rig,"Belt","hips",(0,0,.95),(.78*width,.52,.14),leather)
- piece(rig,"Face","head",(0,0,2.02),(.50,.43,.55),skin,"sphere")
+ piece(rig,"Face","head",(0,0,2.02),(.41,.34,.46),skin,"sphere")
  piece(rig,"Neck guard","spine",(0,0,1.79),(.56,.45,.15),metal)
  for side,s in (("L",-1),("R",1)):
-  piece(rig,"Pauldron_"+side,"spine",(s*.51*width,0,1.65),(.38,.51,.22),metal)
+  piece(rig,"Pauldron_"+side,"spine",(s*.51*width,0,1.65),(.31,.39,.22),metal)
   piece(rig,"Arm_"+side,"arm_"+side,(s*.53*width,0,1.31),(.25,.30,.65),armor)
   piece(rig,"Hand_"+side,"arm_"+side,(s*.55*width,.0,1.06),(.25,.28,.21),skin)
   piece(rig,"Leg_"+side,"leg_"+side,(s*.22,0,.49),(.29,.37,.76),leather)
