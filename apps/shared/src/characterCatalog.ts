@@ -6,7 +6,11 @@ export const FACTIONS={
 export const RACES={
   sunborne:{name:"Sunborne",faction:"radiant-accord",description:"Citadel-born guardians touched by living sunlight.",color:"#e3bc78"},
   thornkin:{name:"Thornkin",faction:"radiant-accord",description:"Forestbound wanderers who defend the ancient groves.",color:"#86bd87"},
-  ashforged:{name:"Ashforged",faction:"umbral-dominion",description:"Volcanic smith-clans bound by iron and oath.",color:"#ad665e"},
+  stonehearth:{name:"Stonehearth",faction:"radiant-accord",description:"Compact mountain artisans famed for engineering and ironwork.",color:"#c68b57"},
+  aetheri:{name:"Aetheri",faction:"radiant-accord",description:"Tall, luminous scholars who channel celestial currents.",color:"#b7b3eb"},
+  ashforged:{name:"Ashforged",faction:"umbral-dominion",description:"Fierce green-skinned warriors tempered by volcanic forges.",color:"#829d58"},
+  hornwarden:{name:"Hornwarden",faction:"umbral-dominion",description:"Towering horned nomads bearing ancestral totems.",color:"#a58b72"},
+  hollowborn:{name:"Hollowborn",faction:"umbral-dominion",description:"Pale wanderers who survived the great blight.",color:"#a0a7a1"},
   veilkin:{name:"Veilkin",faction:"umbral-dominion",description:"Shadow-adapted seekers of hidden truths.",color:"#8f86c7"}
 } as const;
 export const CLASSES={

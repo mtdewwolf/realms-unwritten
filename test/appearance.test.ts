@@ -14,6 +14,10 @@ describe("appearance and character migration",()=>{
   const store=new CharacterIdentityStore(db);
   expect(store.read("a")?.appearance).toEqual(DEFAULT_APPEARANCE);
   expect(new CharacterIdentityStore(db).read("a")?.name).toBe("Aria");
+  const newRace=parseCharacterCreation({type:"create_character",name:"Mira",faction:"radiant-accord",race:"stonehearth",characterClass:"vanguard"})!;
+  db.exec("INSERT INTO characters(id,name) VALUES ('b','Mira')");
+  store.assign("b",newRace);
+  expect(new CharacterIdentityStore(db).read("b")?.race).toBe("stonehearth");
   db.close();
  });
  test("selected appearance persists across store recreation",()=>{

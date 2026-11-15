@@ -6,9 +6,9 @@ function selection(faction:string,race:string,characterClass:string,name="Aster 
  return {type:"create_character",name,faction,race,characterClass};
 }
 describe("new-character selection validation",()=>{
- test("all four original races have consistent faction assignments",()=>{
+ test("all eight original races have consistent faction assignments",()=>{
   expect(Object.keys(FACTIONS)).toHaveLength(2);
-  expect(Object.keys(RACES)).toHaveLength(4);
+  expect(Object.keys(RACES)).toHaveLength(8);
   expect(Object.keys(CLASSES)).toHaveLength(3);
   for(const [race,config] of Object.entries(RACES)){
     for(const cls of Object.keys(CLASSES)){
