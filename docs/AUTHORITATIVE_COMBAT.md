@@ -15,7 +15,8 @@
 - This milestone uses one shared test wolf, not region-based wildlife spawning.
 - Player health/stamina and wolf state are not saved across server restart; guest positions remain SQLite-persisted.
 - A defeated player's character respawns near Verdant Reach after five seconds.
-- Dodge grants server-side invulnerability, **not** a server-side dash movement.
+- Dodge grants server-side invulnerability, **not** a server-side dash movement. Shadeblade Shadowstep is the exception that does move the character, and only to a server-chosen point beside the wolf.
+- Protocol 12 carries the class kits. Spellweaver casts Arc Bolt, Starfall, Mend, and Aether Ward. Shadeblade casts Quickstrike, Shadowstep, Veil, and Keen Senses. Vanguard still casts Bulwark. Numbers, targets, and cooldowns are in `apps/shared/src/classAbilities.ts` and applied only by `CombatSimulation`.
 - No loot, XP, quest rewards, combat log attribution, pathfinding, collision, obstacle blocking or secure account login.
 - Combat actions are not yet spatial-indexed; simulation uses one Bun process. For production, add server-side terrain/collision checks and anti-cheat monitoring.
 
